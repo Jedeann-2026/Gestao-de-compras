@@ -282,17 +282,24 @@
 
         btnScan.addEventListener('click', () => {
             if (isScanning) {
-                html5QrCode.stop().then(() => { 
-                    isScanning = false; 
-                    btnScan.innerText = "Escanear Código"; 
-                    btnScan.classList.replace('bg-rose-600', 'bg-amber-500');
-                    btnScan.classList.replace('text-white', 'text-slate-950');
-                });
+                if (html5QrCode) {
+                    html5QrCode.stop().then(() => { 
+                        isScanning = false; 
+                        btnScan.innerText = "Escanear Código"; 
+                        btnScan.classList.replace('bg-rose-600', 'bg-amber-500');
+                        btnScan.classList.replace('text-white', 'text-slate-950');
+                    }).catch(() => {
+                        isScanning = false;
+                        btnScan.innerText = "Escanear Código";
+                    });
+                }
             } else {
-                html5QrCode = new Html5Qrcode("reader");
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("reader");
+                }
 
                 const config = { 
-                    fps: 15, 
+                    fps: 20, 
                     qrbox: { width: 280, height: 120 }, 
                     aspectRatio: 1.777778,
                     formatsToSupport: [
@@ -312,14 +319,25 @@
                         btnScan.classList.replace('text-slate-950', 'text-white');
                         inputSearch.value = text.trim();
                         buscar(text.trim());
+                    }).catch(() => {
+                        isScanning = false;
+                        btnScan.innerText = "Escanear Código";
+                        inputSearch.value = text.trim();
+                        buscar(text.trim());
                     });
-                }, () => {}).then(() => { 
+                }, () => {
+                    // Ignora falhas contínuas de frame para evitar alertas incômodos
+                }).then(() => { 
                     isScanning = true; 
                     btnScan.innerText = "Parar Câmera"; 
                     btnScan.classList.replace('bg-amber-500', 'bg-rose-600');
                     btnScan.classList.replace('text-slate-950', 'text-white');
                 }).catch(err => {
                     alert("Erro ao iniciar câmera: " + err);
+                    isScanning = false;
+                    btnScan.innerText = "Escanear Código";
+                    btnScan.classList.replace('bg-rose-600', 'bg-amber-500');
+                    btnScan.classList.replace('text-white', 'text-slate-950');
                 });
             }
         });
@@ -459,7 +477,6 @@
 
                     let estoqueGeralTotal = lojaTotalSum + cdTotal;
 
-                    // Unificar lojas de estoque e vendas para a tabela detalhada
                     let todasLojasSet = new Set([...Object.keys(clientMap), ...Object.keys(vendasPorLojaMap)]);
 
                     let detalhesLojaHtml = "";
@@ -489,7 +506,6 @@
                             <span>Total: <strong class="text-amber-400">${estoqueGeralTotal}</strong></span>
                         </div>
 
-                        <!-- RESUMO DE VENDAS NO PERÍODO (INCLUINDO QTD VENDIDA) -->
                         <div class="bg-emerald-950/40 border border-emerald-900/60 p-2.5 rounded-xl text-xs space-y-1">
                             <div class="text-[10px] text-emerald-400 font-bold uppercase"><i class="fa-solid fa-chart-pie mr-1"></i> Resumo de Vendas (Período)</div>
                             <div class="flex justify-between font-mono">
@@ -498,7 +514,6 @@
                             </div>
                         </div>
 
-                        <!-- DETALHADO POR LOJA COM PREÇO, ESTOQUE E QTD VENDIDA -->
                         <div class="space-y-1">
                             <div class="text-[11px] font-semibold text-slate-300"><i class="fa-solid fa-store mr-1"></i> Detalhes por Loja</div>
                             <div class="max-h-44 overflow-y-auto border border-slate-800 rounded-xl bg-slate-950">
@@ -518,7 +533,6 @@
                             </div>
                         </div>
                         
-                        <!-- ENTRADA DE NOTA COM TOTAL POR LINHA -->
                         <div class="pt-2 border-t border-slate-800/80 space-y-2">
                             <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider block"><i class="fa-solid fa-cart-plus mr-1"></i> Compras / Nota de Entrada</span>
                             <div class="grid grid-cols-2 gap-2">
