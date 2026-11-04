@@ -20,17 +20,62 @@
     </style>
 </head>
 <body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans p-4 pb-48 transition-colors duration-200">
-    <div class="max-w-md w-full mx-auto space-y-4">
+
+    <!-- TELA DE LOGIN / AUTENTICAÇÃO -->
+    <div id="modal-login" class="fixed inset-0 bg-slate-950/90 flex items-center justify-center p-4 z-50">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 w-full max-w-sm space-y-5 shadow-2xl transition-colors">
+            <div class="text-center space-y-2">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 text-xl mb-1">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h2 class="text-base font-bold text-slate-900 dark:text-white">AB Conveniência - Acesso</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Selecione seu perfil e digite a senha para entrar</p>
+            </div>
+
+            <form id="form-login" class="space-y-3" onsubmit="fazerLogin(event)">
+                <div>
+                    <label class="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Usuário</label>
+                    <select id="login-usuario" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                        <option value="Jedeann">Jedeann</option>
+                        <option value="Cristiane">Cristiane</option>
+                        <option value="Admin">Admin</option>
+                        <option value="Convidado">Convidado</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Senha de Acesso</label>
+                    <input type="password" id="login-senha" placeholder="Digite sua senha..." class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                </div>
+                <div id="login-erro" class="hidden text-rose-500 text-[11px] text-center font-semibold"></div>
+                
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition shadow-lg mt-2">
+                    Entrar no Sistema
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONTEÚDO PRINCIPAL DO APLICATIVO -->
+    <div id="app-container" class="max-w-md w-full mx-auto space-y-4">
         <!-- HEADER / SCANNER -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
             <div class="flex justify-between items-center mb-3">
-                <h1 class="text-base font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
-                    <i class="fa-solid fa-file-invoice-dollar"></i> AB Conveniencia - Compras
-                </h1>
-                <!-- BOTÃO DIA / NOITE -->
-                <button id="btn-theme-toggle" onclick="alternarTema()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-amber-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="Alternar Tema Dia/Noite">
-                    <i id="theme-icon" class="fa-solid fa-sun text-sm"></i>
-                </button>
+                <div>
+                    <h1 class="text-base font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice-dollar"></i> AB Conveniencia
+                    </h1>
+                    <span id="label-usuario-logado" class="text-[10px] text-slate-400 dark:text-slate-500 block">Usuário: -</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <!-- BOTÃO SAIR / TROCAR USUÁRIO -->
+                    <button onclick="fazerLogout()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-rose-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="Sair / Trocar Usuário">
+                        <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                    </button>
+                    <!-- BOTÃO DIA / NOITE -->
+                    <button id="btn-theme-toggle" onclick="alternarTema()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-amber-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="Alternar Tema Dia/Noite">
+                        <i id="theme-icon" class="fa-solid fa-sun text-sm"></i>
+                    </button>
+                </div>
             </div>
             
             <div id="reader" class="w-full bg-slate-200 dark:bg-black rounded-xl overflow-hidden min-h-[200px] flex items-center justify-center mb-3 border border-slate-300 dark:border-slate-800">
@@ -117,10 +162,14 @@
                 <span id="total-geral-pedido" class="text-base font-bold text-emerald-600 dark:text-emerald-400">R$ 0,00</span>
             </div>
 
+            <!-- BOTÃO DE FINALIZAÇÃO CONDICIONAL POR PERMISSÃO -->
             <div class="grid grid-cols-1 gap-2">
-                <button onclick="finalizarPedidoEntrada()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg">
+                <button id="btn-finalizar-nota" onclick="finalizarPedidoEntrada()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg">
                     <i class="fa-solid fa-circle-check mr-1"></i> Finalizar Nota de Entrada
                 </button>
+                <div id="aviso-convidado-gravar" class="hidden w-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold py-3 rounded-xl text-xs text-center border border-slate-300 dark:border-slate-700">
+                    <i class="fa-solid fa-lock mr-1"></i> Perfil Convidado (Modo Leitura / Sem Gravação)
+                </div>
             </div>
         </div>
     </div>
@@ -172,6 +221,14 @@
         const SUPABASE_KEY = "sb_publishable_taL59MpBnTvHmpfD8eMSnw_f2QuR6w-";
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // SENHAS DOS USUÁRIOS (Pode alterar conforme preferir)
+        const SENHAS_USUARIOS = {
+            "Jedeann": "1234",
+            "Cristiane": "1234",
+            "Admin": "admin123",
+            "Convidado": "" // Sem senha necessária para convidado
+        };
+
         let html5QrCode = null, isScanning = false;
         let regEstoque = null, regVendas = null, regEntradasBase = null;
         let isDataLoaded = false;
@@ -180,7 +237,10 @@
         let rascunhos = JSON.parse(localStorage.getItem('nexxa_rascunhos_pedidos') || '{}');
         let numeroPedidoAtual = Number(localStorage.getItem('nexxa_num_pedido') || 1);
         let ultimoTermoPesquisado = '';
+        let usuarioLogado = localStorage.getItem('nexxa_usuario_logado') || null;
 
+        const modalLogin = document.getElementById('modal-login');
+        const loginErro = document.getElementById('login-erro');
         const btnScan = document.getElementById('btn-scan');
         const formManual = document.getElementById('form-manual');
         const inputSearch = document.getElementById('input-search');
@@ -192,6 +252,66 @@
         const modalCadastro = document.getElementById('modal-cadastro');
         const btnFecharModal = document.getElementById('btn-fechar-modal');
         const formCadastrarProduto = document.getElementById('form-cadastrar-produto');
+
+        // FUNÇÃO DE LOGIN E CONTROLE DE SESSÃO
+        function fazerLogin(e) {
+            e.preventDefault();
+            const usuario = document.getElementById('login-usuario').value;
+            const senha = document.getElementById('login-senha').value;
+
+            if (usuario !== "Convidado" && SENHAS_USUARIOS[usuario] !== senha) {
+                loginErro.innerText = "Senha incorreta para o usuário " + usuario;
+                loginErro.classList.remove('hidden');
+                return;
+            }
+
+            usuarioLogado = usuario;
+            localStorage.setItem('nexxa_usuario_logado', usuario);
+            modalLogin.classList.add('hidden');
+            
+            aplicarPermissoesUsuario();
+        }
+
+        function fazerLogout() {
+            if (confirm("Deseja trocar de usuário / sair da sessão?")) {
+                localStorage.removeItem('nexxa_usuario_logado');
+                usuarioLogado = null;
+                document.getElementById('login-senha').value = '';
+                loginErro.classList.add('hidden');
+                modalLogin.classList.remove('hidden');
+                pararCameraTotal();
+            }
+        }
+
+        function aplicarPermissoesUsuario() {
+            const btnFinalizar = document.getElementById('btn-finalizar-nota');
+            const avisoConvidado = document.getElementById('aviso-convidado-gravar');
+            const labelUsuario = document.getElementById('label-usuario-logado');
+
+            if (labelUsuario) labelUsuario.innerText = `Usuário: ${usuarioLogado}`;
+
+            if (usuarioLogado === 'Convidado') {
+                btnFinalizar.classList.add('hidden');
+                avisoConvidado.classList.remove('hidden');
+            } else {
+                btnFinalizar.classList.remove('hidden');
+                avisoConvidado.classList.add('hidden');
+            }
+        }
+
+        // CONFIGURAÇÃO DOS ÚLTIMOS 7 DIAS (EXCLUINDO O DIA DE HOJE)
+        function inicializarFiltroDatas() {
+            const hoje = new Date();
+            
+            const dataFim = new Date(hoje);
+            dataFim.setDate(hoje.getDate() - 1); // Ontem
+            
+            const dataInicio = new Date(dataFim);
+            dataInicio.setDate(dataFim.getDate() - 6); // 7 dias atrás
+
+            filtroInicio.value = dataInicio.toISOString().split('T')[0];
+            filtroFim.value = dataFim.toISOString().split('T')[0];
+        }
 
         // CONTROLE DE TEMA (CLARO / ESCURO)
         function inicializarTema() {
@@ -237,6 +357,16 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             inicializarTema();
+            inicializarFiltroDatas();
+
+            // Verifica se já está logado
+            if (!usuarioLogado) {
+                modalLogin.classList.remove('hidden');
+            } else {
+                modalLogin.classList.add('hidden');
+                aplicarPermissoesUsuario();
+            }
+
             carregarDadosMemoria();
             numeroPedidoAtual = obterProximoNumeroLivre();
             carregarPedidoAtual();
@@ -387,6 +517,7 @@
 
             let dadosExcel = [];
             dadosExcel.push(["PEDIDO DE COMPRAS", `#${numPedidoFormatted}`]);
+            dadosExcel.push(["USUÁRIO EMISSOR", usuarioLogado]);
             dadosExcel.push(["FORNECEDOR", fornecedor]);
             dadosExcel.push(["DATA EXPORTAÇÃO", new Date().toLocaleDateString('pt-BR')]);
             dadosExcel.push([]);
@@ -924,6 +1055,11 @@
         });
 
         async function finalizarPedidoEntrada() {
+            if (usuarioLogado === 'Convidado') {
+                alert("O perfil Convidado não possui permissão para gravar/finalizar notas.");
+                return;
+            }
+
             if (itensPedido.length === 0) {
                 alert("Adicione pelo menos um item ao pedido antes de finalizar.");
                 return;
@@ -994,6 +1130,7 @@
                 entradasData[notaKey] = {
                     numeroPedido: numAtualStr,
                     fornecedor: fornecedor,
+                    usuarioEmissor: usuarioLogado,
                     dataFinalizacao: new Date().toISOString(),
                     itens: itensPedido,
                     totalGeral: itensPedido.reduce((acc, i) => acc + i.subtotal, 0)
@@ -1008,7 +1145,7 @@
 
                 regEntradasBase = { id: 'entradas', data: entradasData };
 
-                alert(`Nota de Entrada #${numAtualStr} do fornecedor "${fornecedor}" finalizada e salva nas nuvens com sucesso!`);
+                alert(`Nota de Entrada #${numAtualStr} do fornecedor "${fornecedor}" finalizada por ${usuarioLogado} e salva nas nuvens com sucesso!`);
                 
                 delete rascunhos[String(numeroPedidoAtual)];
                 localStorage.setItem('nexxa_rascunhos_pedidos', JSON.stringify(rascunhos));
