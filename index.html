@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AB Conveniencia - Compras - Mobile</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
@@ -14,15 +19,22 @@
         #reader video { object-fit: cover !important; border-radius: 0.75rem; }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans p-4 pb-48">
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans p-4 pb-48 transition-colors duration-200">
     <div class="max-w-md w-full mx-auto space-y-4">
         <!-- HEADER / SCANNER -->
-        <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl">
-            <h1 class="text-base font-bold text-amber-400 mb-3 text-center flex items-center justify-center gap-2">
-                <i class="fa-solid fa-file-invoice-dollar"></i> AB Conveniencia - Compras
-            </h1>
-            <div id="reader" class="w-full bg-black rounded-xl overflow-hidden min-h-[200px] flex items-center justify-center mb-3 border border-slate-800">
-                <span class="text-xs text-slate-500">Câmera desativada</span>
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
+            <div class="flex justify-between items-center mb-3">
+                <h1 class="text-base font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> AB Conveniencia - Compras
+                </h1>
+                <!-- BOTÃO DIA / NOITE -->
+                <button id="btn-theme-toggle" onclick="alternarTema()" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-amber-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition" title="Alternar Tema Dia/Noite">
+                    <i id="theme-icon" class="fa-solid fa-sun text-sm"></i>
+                </button>
+            </div>
+            
+            <div id="reader" class="w-full bg-slate-200 dark:bg-black rounded-xl overflow-hidden min-h-[200px] flex items-center justify-center mb-3 border border-slate-300 dark:border-slate-800">
+                <span class="text-xs text-slate-500 dark:text-slate-500">Câmera desativada</span>
             </div>
             <button id="btn-scan" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition">
                 Escanear Código
@@ -30,22 +42,22 @@
         </div>
 
         <!-- BUSCA MANUAL E FILTRO DE PERÍODO -->
-        <div class="bg-slate-900 rounded-2xl p-3 border border-slate-800 space-y-3">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-200 dark:border-slate-800 space-y-3 shadow-md transition-colors">
             <form id="form-manual" class="flex gap-2">
-                <input type="text" id="input-search" placeholder="Digite o EAN ou nome..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
-                <button type="submit" class="bg-slate-800 text-amber-400 px-3 py-2 rounded-xl text-xs border border-slate-700 hover:bg-slate-700">
+                <input type="text" id="input-search" placeholder="Digite o EAN ou nome..." class="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                <button type="submit" class="bg-slate-100 dark:bg-slate-800 text-amber-600 dark:text-amber-400 px-3 py-2 rounded-xl text-xs border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700">
                     <i class="fa-solid fa-magnifying-glass"></i>
                 </button>
             </form>
             
-            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
+            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200 dark:border-slate-800">
                 <div>
-                    <label class="block text-[10px] text-slate-400 mb-1">Data Inicial</label>
-                    <input type="date" id="filtro-inicio" onchange="dispararBuscaRecorrente()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-[11px] text-white focus:outline-none focus:border-amber-400">
+                    <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">Data Inicial</label>
+                    <input type="date" id="filtro-inicio" onchange="dispararBuscaRecorrente()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2 py-1.5 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                 </div>
                 <div>
-                    <label class="block text-[10px] text-slate-400 mb-1">Data Final</label>
-                    <input type="date" id="filtro-fim" onchange="dispararBuscaRecorrente()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-[11px] text-white focus:outline-none focus:border-amber-400">
+                    <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">Data Final</label>
+                    <input type="date" id="filtro-fim" onchange="dispararBuscaRecorrente()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2 py-1.5 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                 </div>
             </div>
         </div>
@@ -53,17 +65,17 @@
         <div id="status-alert" class="hidden p-2 rounded-xl text-xs text-center"></div>
 
         <!-- PAINEL DE PEDIDOS PENDENTES (RASCUNHOS) -->
-        <div id="container-pendentes" class="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3 shadow-xl">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h2 class="font-bold text-amber-400 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+        <div id="container-pendentes" class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xl transition-colors">
+            <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
+                <h2 class="font-bold text-amber-600 dark:text-amber-400 text-xs flex items-center gap-1.5 uppercase tracking-wider">
                     <i class="fa-solid fa-clock-rotate-left"></i> Pedidos Pendentes / Rascunhos
                 </h2>
-                <button onclick="novoPedidoRascunho()" class="text-[11px] bg-slate-800 text-amber-400 px-2 py-1 rounded-lg border border-slate-700 hover:bg-slate-700">
+                <button onclick="novoPedidoRascunho()" class="text-[11px] bg-slate-100 dark:bg-slate-800 text-amber-600 dark:text-amber-400 px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700">
                     <i class="fa-solid fa-plus mr-1"></i>Novo Rascunho
                 </button>
             </div>
             <div id="lista-pendentes" class="space-y-2 max-h-40 overflow-y-auto pr-1">
-                <p class="text-[11px] text-slate-500 text-center py-2">Nenhum rascunho pendente.</p>
+                <p class="text-[11px] text-slate-400 dark:text-slate-500 text-center py-2">Nenhum rascunho pendente.</p>
             </div>
         </div>
 
@@ -71,19 +83,19 @@
         <div id="results-container" class="space-y-4"></div>
 
         <!-- LISTA DE ITENS DO PEDIDO EM ANDAMENTO -->
-        <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3 shadow-xl">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xl transition-colors">
+            <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
                 <div class="flex items-center gap-2">
-                    <h2 class="font-bold text-amber-400 text-sm flex items-center gap-1.5">
+                    <h2 class="font-bold text-amber-600 dark:text-amber-400 text-sm flex items-center gap-1.5">
                         <i class="fa-solid fa-cart-flatbed"></i> Pedido em Edição
                     </h2>
-                    <span id="num-pedido-badge" class="bg-slate-800 text-amber-400 text-[10px] font-mono px-2 py-0.5 rounded-full border border-slate-700">#0001</span>
+                    <span id="num-pedido-badge" class="bg-slate-100 dark:bg-slate-800 text-amber-600 dark:text-amber-400 text-[10px] font-mono px-2 py-0.5 rounded-full border border-slate-300 dark:border-slate-700">#0001</span>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button onclick="exportarPedidoExcel()" class="text-[11px] text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1 font-semibold">
+                    <button onclick="exportarPedidoExcel()" class="text-[11px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 transition flex items-center gap-1 font-semibold">
                         <i class="fa-solid fa-file-excel"></i>Exportar
                     </button>
-                    <button onclick="limparPedido()" class="text-[11px] text-rose-400 hover:text-rose-300 transition">
+                    <button onclick="limparPedido()" class="text-[11px] text-rose-600 dark:text-rose-400 hover:text-rose-500 dark:hover:text-rose-300 transition">
                         <i class="fa-solid fa-trash-can mr-1"></i>Limpar
                     </button>
                 </div>
@@ -91,18 +103,18 @@
 
             <!-- CAMPO DE FORNECEDOR -->
             <div>
-                <label class="text-[10px] text-slate-400 block mb-1">Fornecedor / Distribuidor</label>
-                <input type="text" id="input-fornecedor" oninput="salvarEstadoPedidoAtual()" placeholder="Ex: Distribuidora São Paulo" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                <label class="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Fornecedor / Distribuidor</label>
+                <input type="text" id="input-fornecedor" oninput="salvarEstadoPedidoAtual()" placeholder="Ex: Distribuidora São Paulo" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
             </div>
             
             <div id="lista-pedido" class="space-y-2 max-h-60 overflow-y-auto pr-1">
-                <p class="text-xs text-slate-500 text-center py-4">Nenhum item adicionado ao pedido.</p>
+                <p class="text-xs text-slate-400 dark:text-slate-500 text-center py-4">Nenhum item adicionado ao pedido.</p>
             </div>
 
             <!-- RESUMO DE TOTAL GERAL DA NOTA -->
-            <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 flex justify-between items-center text-xs">
-                <span class="text-slate-400">Total do Pedido:</span>
-                <span id="total-geral-pedido" class="text-base font-bold text-emerald-400">R$ 0,00</span>
+            <div class="bg-slate-50 dark:bg-slate-950 rounded-xl p-3 border border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+                <span class="text-slate-500 dark:text-slate-400">Total do Pedido:</span>
+                <span id="total-geral-pedido" class="text-base font-bold text-emerald-600 dark:text-emerald-400">R$ 0,00</span>
             </div>
 
             <div class="grid grid-cols-1 gap-2">
@@ -114,38 +126,38 @@
     </div>
 
     <!-- MODAL DE CADASTRO DE NOVO PRODUTO -->
-    <div id="modal-cadastro" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-amber-400 font-bold text-sm flex items-center gap-2">
+    <div id="modal-cadastro" class="fixed inset-0 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl transition-colors">
+            <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+                <h3 class="text-amber-600 dark:text-amber-400 font-bold text-sm flex items-center gap-2">
                     <i class="fa-solid fa-box-open"></i> Cadastrar Novo Produto
                 </h3>
-                <button type="button" id="btn-fechar-modal" class="text-slate-400 hover:text-white">
+                <button type="button" id="btn-fechar-modal" class="text-slate-400 hover:text-slate-600 dark:hover:text-white">
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
             <form id="form-cadastrar-produto" class="space-y-3">
                 <div>
-                    <label class="text-[11px] text-slate-400 block mb-1">Código EAN</label>
-                    <input type="text" id="cad-ean" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-400 font-mono focus:outline-none focus:border-amber-400">
+                    <label class="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Código EAN</label>
+                    <input type="text" id="cad-ean" required class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-600 dark:text-amber-400 font-mono focus:outline-none focus:border-amber-400">
                 </div>
                 <div>
-                    <label class="text-[11px] text-slate-400 block mb-1">Descrição / Nome do Produto</label>
-                    <input type="text" id="cad-descricao" required placeholder="Ex: Biscoito Recheado 130g" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    <label class="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Descrição / Nome do Produto</label>
+                    <input type="text" id="cad-descricao" required placeholder="Ex: Biscoito Recheado 130g" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                 </div>
                 <div>
-                    <label class="text-[11px] text-slate-400 block mb-1">Categoria (Existente na Base)</label>
-                    <select id="cad-categoria" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    <label class="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Categoria (Existente na Base)</label>
+                    <select id="cad-categoria" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                     </select>
                 </div>
                 <div class="grid grid-cols-2 gap-2 pt-2">
                     <div>
-                        <label class="text-[11px] text-slate-400 block mb-1">Qtd Comprada</label>
-                        <input type="number" id="cad-qtd" min="1" value="1" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                        <label class="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Qtd Comprada</label>
+                        <input type="number" id="cad-qtd" min="1" value="1" required class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                     </div>
                     <div>
-                        <label class="text-[11px] text-slate-400 block mb-1">Preço de Custo (R$)</label>
-                        <input type="number" step="0.01" id="cad-custo" min="0" placeholder="0.00" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                        <label class="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Preço de Custo (R$)</label>
+                        <input type="number" step="0.01" id="cad-custo" min="0" placeholder="0.00" required class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                     </div>
                 </div>
                 <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition mt-2">
@@ -181,6 +193,31 @@
         const btnFecharModal = document.getElementById('btn-fechar-modal');
         const formCadastrarProduto = document.getElementById('form-cadastrar-produto');
 
+        // CONTROLE DE TEMA (CLARO / ESCURO)
+        function inicializarTema() {
+            const temaSalvo = localStorage.getItem('nexxa_tema');
+            if (temaSalvo === 'dark' || (!temaSalvo && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                atualizarIconeTema(true);
+            } else {
+                document.documentElement.classList.remove('dark');
+                atualizarIconeTema(false);
+            }
+        }
+
+        function alternarTema() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('nexxa_tema', isDark ? 'dark' : 'light');
+            atualizarIconeTema(isDark);
+        }
+
+        function atualizarIconeTema(isDark) {
+            const icon = document.getElementById('theme-icon');
+            if (icon) {
+                icon.className = isDark ? 'fa-solid fa-sun text-sm' : 'fa-solid fa-moon text-sm';
+            }
+        }
+
         async function carregarDadosMemoria() {
             try {
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
@@ -194,11 +231,12 @@
                 statusAlert.classList.add('hidden');
             } catch (err) {
                 statusAlert.innerText = "Erro ao carregar dados: " + err.message;
-                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-950 text-rose-300 border border-rose-800";
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
             }
         }
 
         window.addEventListener('DOMContentLoaded', () => {
+            inicializarTema();
             carregarDadosMemoria();
             numeroPedidoAtual = obterProximoNumeroLivre();
             carregarPedidoAtual();
@@ -284,7 +322,7 @@
             const chaves = Object.keys(rascunhos);
 
             if (chaves.length === 0) {
-                container.innerHTML = `<p class="text-[11px] text-slate-500 text-center py-2">Nenhum rascunho pendente.</p>`;
+                container.innerHTML = `<p class="text-[11px] text-slate-400 dark:text-slate-500 text-center py-2">Nenhum rascunho pendente.</p>`;
                 return;
             }
 
@@ -296,16 +334,16 @@
 
                 let div = document.createElement('div');
                 div.onclick = () => selecionarRascunho(key);
-                div.className = `flex justify-between items-center p-2 rounded-xl text-xs cursor-pointer border transition ${isAtual ? 'bg-slate-800 border-amber-500 text-amber-400' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'}`;
+                div.className = `flex justify-between items-center p-2 rounded-xl text-xs cursor-pointer border transition ${isAtual ? 'bg-amber-50 dark:bg-slate-800 border-amber-500 text-amber-600 dark:text-amber-400' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'}`;
                 
                 div.innerHTML = `
                     <div class="flex items-center gap-2">
                         <span class="font-mono font-bold">#${String(r.numero).padStart(4, '0')}</span>
-                        <span class="truncate max-w-[120px] text-slate-400">${r.fornecedor || 'Sem Fornecedor'}</span>
+                        <span class="truncate max-w-[120px] text-slate-500 dark:text-slate-400">${r.fornecedor || 'Sem Fornecedor'}</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="text-[10px] bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-slate-400">${totalItens} itens</span>
-                        <button onclick="excluirRascunho('${key}', event)" class="text-slate-500 hover:text-rose-400 p-1">
+                        <span class="text-[10px] bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">${totalItens} itens</span>
+                        <button onclick="excluirRascunho('${key}', event)" class="text-slate-400 hover:text-rose-500 p-1">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
@@ -314,7 +352,6 @@
             });
         }
 
-        // BUSCA O ÚLTIMO PREÇO DE COMPRA NAS NOTAS GRAVADAS NO SUPABASE (Retorna 0 se não encontrar)
         function obterUltimoPrecoCompra(eanAlvo) {
             if (!regEntradasBase || !regEntradasBase.data) return 0;
 
@@ -339,7 +376,6 @@
             return ultimoPreco;
         }
 
-        // EXPORTAÇÃO EXCEL
         function exportarPedidoExcel() {
             if (itensPedido.length === 0) {
                 alert("Não existem itens no pedido para exportar.");
@@ -389,7 +425,6 @@
             XLSX.writeFile(workbook, nomeArquivo);
         }
 
-        // CONTROLO DE CÂMARA COM DESTRUÇÃO COMPLETA DE RECURSOS
         btnScan.addEventListener('click', async () => {
             if (isScanning) {
                 await pararCameraTotal();
@@ -437,7 +472,7 @@
             } catch (err) {
                 console.error("Erro ao iniciar câmara:", err);
                 statusAlert.innerText = "Erro na câmara. Verifique as permissões.";
-                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-950 text-rose-300 border border-rose-800";
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
                 statusAlert.classList.remove('hidden');
                 isScanning = false;
                 btnScan.innerText = "Escanear Código";
@@ -481,14 +516,14 @@
             ultimoTermoPesquisado = termo;
             if (!isDataLoaded) {
                 statusAlert.innerText = "Aguarde, dados ainda sendo carregados...";
-                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-amber-950 text-amber-300 border border-amber-800";
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800";
                 statusAlert.classList.remove('hidden');
                 return;
             }
 
             if (exibirAlerta) {
                 statusAlert.innerText = `Buscando "${termo}"...`;
-                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-slate-900 text-amber-400 border border-slate-800";
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 border border-slate-200 dark:border-slate-800";
                 statusAlert.classList.remove('hidden');
             }
 
@@ -605,16 +640,15 @@
                 
                 let sugestaoCompras = qtdVendidaGeral - estoqueGeralTotal;
                 let sugestaoHtml = sugestaoCompras > 0 ? `
-                    <div class="flex justify-between font-mono text-amber-400 pt-1 border-t border-emerald-900/40">
+                    <div class="flex justify-between font-mono text-amber-600 dark:text-amber-400 pt-1 border-t border-emerald-200 dark:border-emerald-900/40">
                         <span>Sugestão de Compras:</span>
                         <strong>+${sugestaoCompras} un</strong>
                     </div>
                 ` : '';
 
-                // Sempre exibe o último preço de compra (mesmo que zerado)
                 let ultimoPrecoCompra = obterUltimoPrecoCompra(info.codigo);
                 let ultimoPrecoHtml = `
-                    <div class="flex justify-between font-mono text-cyan-400 pt-1 border-t border-emerald-900/40">
+                    <div class="flex justify-between font-mono text-cyan-600 dark:text-cyan-400 pt-1 border-t border-emerald-200 dark:border-emerald-900/40">
                         <span>Último Preço Custo:</span>
                         <strong>${Number(ultimoPrecoCompra).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
                     </div>
@@ -632,40 +666,40 @@
                     let vendaLoja = vendasPorLojaMap[loja] ? vendasPorLojaMap[loja].qtdVenda : 0;
 
                     detalhesLojaHtml += `
-                        <tr class="border-b border-slate-900 text-[11px]">
-                            <td class="p-1.5 font-medium">${loja}</td>
-                            <td class="p-1.5 text-right text-emerald-400">${prcLoja}</td>
-                            <td class="p-1.5 text-center text-amber-400 font-semibold">${estLoja}</td>
-                            <td class="p-1.5 text-center text-white font-bold">${vendaLoja} un</td>
+                        <tr class="border-b border-slate-200 dark:border-slate-900 text-[11px]">
+                            <td class="p-1.5 font-medium text-slate-800 dark:text-slate-200">${loja}</td>
+                            <td class="p-1.5 text-right text-emerald-600 dark:text-emerald-400">${prcLoja}</td>
+                            <td class="p-1.5 text-center text-amber-600 dark:text-amber-400 font-semibold">${estLoja}</td>
+                            <td class="p-1.5 text-center text-slate-900 dark:text-white font-bold">${vendaLoja} un</td>
                         </tr>`;
                 });
 
                 let card = document.createElement('div');
-                card.className = "bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3 shadow-xl";
+                card.className = "bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xl transition-colors";
                 card.innerHTML = `
-                    <h2 class="font-bold text-white text-sm">${info.descricao}</h2>
-                    <div class="text-[10px] text-amber-400">EAN: ${info.codigo} | Cat: ${info.categoria}</div>
-                    <div class="text-[11px] bg-slate-950 p-2 rounded-xl border border-slate-800 flex justify-around text-slate-300 font-mono">
-                        <span>Estq. Loja: <strong class="text-white">${lojaTotalSum}</strong></span>
-                        <span>Estq. CD: <strong class="text-blue-400">${cdTotal}</strong></span>
-                        <span>Total: <strong class="text-amber-400">${estoqueGeralTotal}</strong></span>
+                    <h2 class="font-bold text-slate-900 dark:text-white text-sm">${info.descricao}</h2>
+                    <div class="text-[10px] text-amber-600 dark:text-amber-400">EAN: ${info.codigo} | Cat: ${info.categoria}</div>
+                    <div class="text-[11px] bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-around text-slate-600 dark:text-slate-300 font-mono">
+                        <span>Estq. Loja: <strong class="text-slate-900 dark:text-white">${lojaTotalSum}</strong></span>
+                        <span>Estq. CD: <strong class="text-blue-600 dark:text-blue-400">${cdTotal}</strong></span>
+                        <span>Total: <strong class="text-amber-600 dark:text-amber-400">${estoqueGeralTotal}</strong></span>
                     </div>
 
-                    <div class="bg-emerald-950/40 border border-emerald-900/60 p-2.5 rounded-xl text-xs space-y-1">
-                        <div class="text-[10px] text-emerald-400 font-bold uppercase"><i class="fa-solid fa-chart-pie mr-1"></i> Resumo de Vendas (Período)</div>
+                    <div class="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 p-2.5 rounded-xl text-xs space-y-1">
+                        <div class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase"><i class="fa-solid fa-chart-pie mr-1"></i> Resumo de Vendas (Período)</div>
                         <div class="flex justify-between font-mono">
-                            <span>Qtd Vendida: <strong class="text-white">${qtdVendidaGeral} un</strong></span>
-                            <span>Total Faturado: <strong class="text-emerald-400">${totalVendidoGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></span>
+                            <span>Qtd Vendida: <strong class="text-slate-900 dark:text-white">${qtdVendidaGeral} un</strong></span>
+                            <span>Total Faturado: <strong class="text-emerald-600 dark:text-emerald-400">${totalVendidoGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></span>
                         </div>
                         ${sugestaoHtml}
                         ${ultimoPrecoHtml}
                     </div>
 
                     <div class="space-y-1">
-                        <div class="text-[11px] font-semibold text-slate-300"><i class="fa-solid fa-store mr-1"></i> Detalhes por Loja</div>
-                        <div class="max-h-44 overflow-y-auto border border-slate-800 rounded-xl bg-slate-950">
+                        <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-300"><i class="fa-solid fa-store mr-1"></i> Detalhes por Loja</div>
+                        <div class="max-h-44 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950">
                             <table class="w-full text-xs text-left">
-                                <thead class="text-slate-400 border-b border-slate-800 bg-slate-900/50 sticky top-0">
+                                <thead class="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/50 sticky top-0">
                                     <tr>
                                         <th class="p-1.5 text-[10px]">Loja/Filial</th>
                                         <th class="p-1.5 text-[10px] text-right">Preço Venda</th>
@@ -674,28 +708,28 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${detalhesLojaHtml || '<tr><td colspan="4" class="p-3 text-center text-slate-500">Nenhum dado encontrado</td></tr>'}
+                                    ${detalhesLojaHtml || '<tr><td colspan="4" class="p-3 text-center text-slate-400 dark:text-slate-500">Nenhum dado encontrado</td></tr>'}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                     
-                    <div class="pt-2 border-t border-slate-800/80 space-y-2">
-                        <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider block"><i class="fa-solid fa-cart-plus mr-1"></i> Compras / Nota de Entrada</span>
+                    <div class="pt-2 border-t border-slate-200 dark:border-slate-800/80 space-y-2">
+                        <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block"><i class="fa-solid fa-cart-plus mr-1"></i> Compras / Nota de Entrada</span>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label class="text-[10px] text-slate-400 block mb-1">Qtd Comprada</label>
-                                <input type="number" id="qtd-entrada-${info.codigo}" min="1" placeholder="0" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                <label class="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Qtd Comprada</label>
+                                <input type="number" id="qtd-entrada-${info.codigo}" min="1" placeholder="0" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                             </div>
                             <div>
-                                <label class="text-[10px] text-slate-400 block mb-1">Preço Custo (R$)</label>
-                                <input type="number" step="0.01" id="custo-entrada-${info.codigo}" placeholder="0.00" value="${custoSugerido}" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                <label class="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Preço Custo (R$)</label>
+                                <input type="number" step="0.01" id="custo-entrada-${info.codigo}" placeholder="0.00" value="${custoSugerido}" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                             </div>
                         </div>
                         
-                        <div class="flex justify-between items-center bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 text-xs">
-                            <span class="text-slate-400">Total desta linha:</span>
-                            <span id="total-linha-${info.codigo}" class="font-mono font-bold text-amber-400">R$ 0,00</span>
+                        <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-950 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                            <span class="text-slate-500 dark:text-slate-400">Total desta linha:</span>
+                            <span id="total-linha-${info.codigo}" class="font-mono font-bold text-amber-600 dark:text-amber-400">R$ 0,00</span>
                         </div>
 
                         <button onclick="adicionarAoPedido('${info.codigo}', '${info.descricao.replace(/'/g, "\\'")}', '${info.categoria}')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-xl text-xs transition">
@@ -773,7 +807,7 @@
             const totalElement = document.getElementById('total-geral-pedido');
 
             if (itensPedido.length === 0) {
-                container.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">Nenhum item adicionado ao pedido.</p>`;
+                container.innerHTML = `<p class="text-xs text-slate-400 dark:text-slate-500 text-center py-4">Nenhum item adicionado ao pedido.</p>`;
                 totalElement.innerText = "R$ 0,00";
                 return;
             }
@@ -784,17 +818,17 @@
             itensPedido.forEach(item => {
                 totalGeral += item.subtotal;
                 let div = document.createElement('div');
-                div.className = "flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs";
+                div.className = "flex justify-between items-center bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs transition-colors";
                 div.innerHTML = `
                     <div class="flex-1 pr-2">
-                        <div class="font-bold text-white truncate max-w-[190px]">${item.descricao}</div>
-                        <div class="text-[10px] text-slate-400">
+                        <div class="font-bold text-slate-900 dark:text-white truncate max-w-[190px]">${item.descricao}</div>
+                        <div class="text-[10px] text-slate-500 dark:text-slate-400">
                             EAN: ${item.codigo} | ${item.qtd}x ${item.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="font-mono font-bold text-amber-400">${item.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        <button onclick="removerDoPedido('${item.codigo}')" class="text-slate-500 hover:text-rose-400 p-1" title="Excluir item">
+                        <span class="font-mono font-bold text-amber-600 dark:text-amber-400">${item.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        <button onclick="removerDoPedido('${item.codigo}')" class="text-slate-400 hover:text-rose-500 p-1" title="Excluir item">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
@@ -903,6 +937,7 @@
             }
 
             try {
+                // 1. Atualizar o Estoque Global na Base
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
                 if (error) throw error;
 
@@ -945,8 +980,13 @@
 
                 if (updateError) throw updateError;
 
+                // 2. Garantir que as entradas sejam tratadas como Objeto (Dicionário)
                 let regEntradas = cloudData.find(d => d.id === 'entradas');
-                let entradasData = regEntradas ? (regEntradas.data || {}) : {};
+                let entradasData = {};
+                
+                if (regEntradas && regEntradas.data && !Array.isArray(regEntradas.data)) {
+                    entradasData = regEntradas.data;
+                }
 
                 const numAtualStr = String(numeroPedidoAtual).padStart(4, '0');
                 const notaKey = "NOTA_" + Date.now();
@@ -959,21 +999,16 @@
                     totalGeral: itensPedido.reduce((acc, i) => acc + i.subtotal, 0)
                 };
 
-                if (regEntradas) {
-                    await supabaseClient
-                        .from('nexxa_store')
-                        .update({ data: entradasData })
-                        .eq('id', 'entradas');
-                } else {
-                    await supabaseClient
-                        .from('nexxa_store')
-                        .insert([{ id: 'entradas', data: entradasData }]);
-                }
+                // 3. Gravação segura via UPSERT no ID 'entradas'
+                const { error: upsertError } = await supabaseClient
+                    .from('nexxa_store')
+                    .upsert({ id: 'entradas', data: entradasData });
+
+                if (upsertError) throw upsertError;
 
                 regEntradasBase = { id: 'entradas', data: entradasData };
 
-                const numAtual = String(numeroPedidoAtual).padStart(4, '0');
-                alert(`Nota de Entrada #${numAtual} do fornecedor "${fornecedor}" finalizada e salva no ID 'entradas' do Supabase com sucesso!`);
+                alert(`Nota de Entrada #${numAtualStr} do fornecedor "${fornecedor}" finalizada e salva nas nuvens com sucesso!`);
                 
                 delete rascunhos[String(numeroPedidoAtual)];
                 localStorage.setItem('nexxa_rascunhos_pedidos', JSON.stringify(rascunhos));
@@ -989,6 +1024,7 @@
                 resultsContainer.innerHTML = "";
 
             } catch (err) {
+                console.error("Erro detalhado:", err);
                 alert("Erro ao finalizar nota de entrada: " + err.message);
             }
         }
