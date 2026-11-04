@@ -205,7 +205,6 @@
         }
 
         function novoPedidoRascunho() {
-            // Encontra o próximo número não utilizado
             let proxNum = 1;
             while (rascunhos[String(proxNum)]) {
                 proxNum++;
@@ -272,7 +271,20 @@
                 });
             } else {
                 html5QrCode = new Html5Qrcode("reader");
-                const config = { fps: 20, qrbox: { width: 280, height: 120 }, aspectRatio: 1.777778 };
+
+                // Configuração focada para agilizar a leitura de códigos EAN/UPC
+                const config = { 
+                    fps: 15, 
+                    qrbox: { width: 280, height: 120 }, 
+                    aspectRatio: 1.777778,
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
+                        Html5QrcodeSupportedFormats.CODE_128
+                    ]
+                };
 
                 html5QrCode.start({ facingMode: "environment" }, config, (text) => {
                     html5QrCode.stop().then(() => {
@@ -404,7 +416,8 @@
                         let dados = clientMap[cli];
                         let est = dados.estoque || 0;
                         let prc = dados.preco > 0 ? dados.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
-                        lojasHtml += `<tr class="border-b border-slate-800"><td class="p-2">${cli}</td><td class="p-2 text-right text-emerald-400">${prc}</td><td class="p-2 text-center">${est}</td><td class="p-2 text-center text-blue-400">${cdTotal}</td></tr>`;
+                        // Removida a coluna de CD da linha da tabela
+                        lojasHtml += `<tr class="border-b border-slate-800"><td class="p-2">${cli}</td><td class="p-2 text-right text-emerald-400">${prc}</td><td class="p-2 text-center font-semibold">${est}</td></tr>`;
                     });
 
                     let card = document.createElement('div');
@@ -418,8 +431,12 @@
                             <span>Total: <strong class="text-amber-400">${estoqueGeralTotal}</strong></span>
                         </div>
                         <table class="w-full text-xs text-left">
-                            <tr class="text-slate-400 border-b border-slate-800"><th class="p-2">Loja/Filial</th><th class="p-2 text-right">Preço</th><th class="p-2 text-center">Loja</th><th class="p-2 text-center">CD</th></tr>
-                            ${lojasHtml || '<tr><td colspan="4" class="p-2 text-center text-slate-500">Sem dados por filial</td></tr>'}
+                            <tr class="text-slate-400 border-b border-slate-800">
+                                <th class="p-2">Loja/Filial</th>
+                                <th class="p-2 text-right">Preço</th>
+                                <th class="p-2 text-center">Estoque Loja</th>
+                            </tr>
+                            ${lojasHtml || '<tr><td colspan="3" class="p-2 text-center text-slate-500">Sem dados por filial</td></tr>'}
                         </table>
                         
                         <!-- ENTRADA DE NOTA COM TOTAL POR LINHA -->
@@ -677,11 +694,9 @@
                 const numAtual = String(numeroPedidoAtual).padStart(4, '0');
                 alert(`Nota de Entrada #${numAtual} do fornecedor "${fornecedor}" finalizada com sucesso!`);
                 
-                // Remove dos rascunhos pendentes
                 delete rascunhos[String(numeroPedidoAtual)];
                 localStorage.setItem('nexxa_rascunhos_pedidos', JSON.stringify(rascunhos));
 
-                // Incrementa a numeração sequencial do próximo pedido
                 numeroPedidoAtual++;
                 localStorage.setItem('nexxa_num_pedido', numeroPedidoAtual);
 
