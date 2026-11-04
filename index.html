@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nexxa Scanner & Entrada de Nota - Mobile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        #reader video { object-fit: cover !important; border-radius: 0.75rem; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans p-4 pb-48">
+    <div class="max-w-md w-full mx-auto space-y-4">
+        <!-- HEADER / SCANNER -->
+        <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl">
+            <h1 class="text-base font-bold text-amber-400 mb-3 text-center flex items-center justify-center gap-2">
+                <i class="fa-solid fa-file-invoice-dollar"></i> NEXXA - Entrada de Nota & Estoque
+            </h1>
+            <div id="reader" class="w-full bg-black rounded-xl overflow-hidden min-h-[200px] flex items-center justify-center mb-3 border border-slate-800">
+                <span class="text-xs text-slate-500">Câmera desativada</span>
+            </div>
+            <button id="btn-scan" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition">
+                Escanear Código
+            </button>
+        </div>
+
+        <!-- BUSCA MANUAL -->
+        <div class="bg-slate-900 rounded-2xl p-3 border border-slate-800">
+            <form id="form-manual" class="flex gap-2">
+                <input type="text" id="input-search" placeholder="Digite o EAN ou nome..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                <button type="submit" class="bg-slate-800 text-amber-400 px-3 py-2 rounded-xl text-xs border border-slate-700 hover:bg-slate-700">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+            </form>
+        </div>
+
+        <div id="status-alert" class="hidden p-2 rounded-xl text-xs text-center"></div>
+
+        <!-- PAINEL DE PEDIDOS PENDENTES (RASCUNHOS) -->
+        <div id="container-pendentes" class="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3 shadow-xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <h2 class="font-bold text-amber-400 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Pedidos Pendentes / Rascunhos
+                </h2>
+                <button onclick="novoPedidoRascunho()" class="text-[11px] bg-slate-800 text-amber-400 px-2 py-1 rounded-lg border border-slate-700 hover:bg-slate-700">
+                    <i class="fa-solid fa-plus mr-1"></i>Novo Rascunho
+                </button>
+            </div>
+            <div id="lista-pendentes" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                <p class="text-[11px] text-slate-500 text-center py-2">Nenhum rascunho pendente.</p>
+            </div>
+        </div>
+
+        <!-- RESULTADOS DA BUSCA -->
+        <div id="results-container" class="space-y-4"></div>
+
+        <!-- LISTA DE ITENS DO PEDIDO EM ANDAMENTO -->
+        <div class="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3 shadow-xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <div class="flex items-center gap-2">
+                    <h2 class="font-bold text-amber-400 text-sm flex items-center gap-1.5">
+                        <i class="fa-solid fa-cart-flatbed"></i> Pedido em Edição
+                    </h2>
+                    <span id="num-pedido-badge" class="bg-slate-800 text-amber-400 text-[10px] font-mono px-2 py-0.5 rounded-full border border-slate-700">#0001</span>
+                </div>
+                <button onclick="limparPedido()" class="text-[11px] text-rose-400 hover:text-rose-300 transition">
+                    <i class="fa-solid fa-trash-can mr-1"></i>Limpar
+                </button>
+            </div>
+
+            <!-- CAMPO DE FORNECEDOR -->
+            <div>
+                <label class="text-[10px] text-slate-400 block mb-1">Fornecedor / Distribuidor</label>
+                <input type="text" id="input-fornecedor" oninput="salvarEstadoPedidoAtual()" placeholder="Ex: Distribuidora São Paulo" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+            </div>
+            
+            <div id="lista-pedido" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                <p class="text-xs text-slate-500 text-center py-4">Nenhum item adicionado ao pedido.</p>
+            </div>
+
+            <!-- RESUMO DE TOTAL GERAL DA NOTA -->
+            <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 flex justify-between items-center text-xs">
+                <span class="text-slate-400">Total do Pedido:</span>
+                <span id="total-geral-pedido" class="text-base font-bold text-emerald-400">R$ 0,00</span>
+            </div>
+
+            <button onclick="finalizarPedidoEntrada()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg">
+                <i class="fa-solid fa-circle-check mr-1"></i> Finalizar Nota de Entrada
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL DE CADASTRO DE NOVO PRODUTO -->
+    <div id="modal-cadastro" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-amber-400 font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-box-open"></i> Cadastrar Novo Produto
+                </h3>
+                <button type="button" id="btn-fechar-modal" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="form-cadastrar-produto" class="space-y-3">
+                <div>
+                    <label class="text-[11px] text-slate-400 block mb-1">Código EAN</label>
+                    <input type="text" id="cad-ean" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-400 font-mono focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                    <label class="text-[11px] text-slate-400 block mb-1">Descrição / Nome do Produto</label>
+                    <input type="text" id="cad-descricao" required placeholder="Ex: Biscoito Recheado 130g" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                    <label class="text-[11px] text-slate-400 block mb-1">Categoria (Existente na Base)</label>
+                    <select id="cad-categoria" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                        <!-- Categorias dinâmicas serão inseridas aqui -->
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                    <div>
+                        <label class="text-[11px] text-slate-400 block mb-1">Qtd Comprada</label>
+                        <input type="number" id="cad-qtd" min="1" value="1" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-slate-400 block mb-1">Preço de Custo (R$)</label>
+                        <input type="number" step="0.01" id="cad-custo" min="0" placeholder="0.00" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition mt-2">
+                    Salvar e Adicionar ao Pedido
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://mjkqkyuolsqhtxwzivof.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_taL59MpBnTvHmpfD8eMSnw_f2QuR6w-";
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let html5QrCode = null, isScanning = false;
+        let categoriasEncontradas = new Set();
+        let itensPedido = [];
+        let rascunhos = JSON.parse(localStorage.getItem('nexxa_rascunhos_pedidos') || '{}');
+        let numeroPedidoAtual = Number(localStorage.getItem('nexxa_num_pedido') || 1);
+
+        const btnScan = document.getElementById('btn-scan');
+        const formManual = document.getElementById('form-manual');
+        const inputSearch = document.getElementById('input-search');
+        const resultsContainer = document.getElementById('results-container');
+        const statusAlert = document.getElementById('status-alert');
+
+        const modalCadastro = document.getElementById('modal-cadastro');
+        const btnFecharModal = document.getElementById('btn-fechar-modal');
+        const formCadastrarProduto = document.getElementById('form-cadastrar-produto');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarPedidoAtual();
+            atualizarListaPendentes();
+        });
+
+        function atualizarNumeroPedidoBadge() {
+            const badge = document.getElementById('num-pedido-badge');
+            if (badge) badge.innerText = '#' + String(numeroPedidoAtual).padStart(4, '0');
+        }
+
+        function salvarEstadoPedidoAtual() {
+            const fornecedor = document.getElementById('input-fornecedor').value;
+            const numKey = String(numeroPedidoAtual);
+
+            if (itensPedido.length > 0 || fornecedor.trim() !== '') {
+                rascunhos[numKey] = {
+                    numero: numeroPedidoAtual,
+                    fornecedor: fornecedor,
+                    itens: itensPedido,
+                    dataAtualizacao: new Date().toISOString()
+                };
+            } else {
+                delete rascunhos[numKey];
+            }
+
+            localStorage.setItem('nexxa_rascunhos_pedidos', JSON.stringify(rascunhos));
+            atualizarListaPendentes();
+        }
+
+        function carregarPedidoAtual() {
+            atualizarNumeroPedidoBadge();
+            const numKey = String(numeroPedidoAtual);
+            if (rascunhos[numKey]) {
+                document.getElementById('input-fornecedor').value = rascunhos[numKey].fornecedor || '';
+                itensPedido = rascunhos[numKey].itens || [];
+            } else {
+                document.getElementById('input-fornecedor').value = '';
+                itensPedido = [];
+            }
+            atualizarInterfacePedido();
+        }
+
+        function selecionarRascunho(num) {
+            numeroPedidoAtual = Number(num);
+            carregarPedidoAtual();
+        }
+
+        function novoPedidoRascunho() {
+            // Encontra o próximo número não utilizado
+            let proxNum = 1;
+            while (rascunhos[String(proxNum)]) {
+                proxNum++;
+            }
+            numeroPedidoAtual = Math.max(proxNum, Number(localStorage.getItem('nexxa_num_pedido') || 1));
+            carregarPedidoAtual();
+        }
+
+        function excluirRascunho(num, e) {
+            e.stopPropagation();
+            if (confirm(`Deseja excluir o rascunho de pedido #${String(num).padStart(4, '0')}?`)) {
+                delete rascunhos[String(num)];
+                localStorage.setItem('nexxa_rascunhos_pedidos', JSON.stringify(rascunhos));
+                if (numeroPedidoAtual === Number(num)) {
+                    carregarPedidoAtual();
+                } else {
+                    atualizarListaPendentes();
+                }
+            }
+        }
+
+        function atualizarListaPendentes() {
+            const container = document.getElementById('lista-pendentes');
+            const chaves = Object.keys(rascunhos);
+
+            if (chaves.length === 0) {
+                container.innerHTML = `<p class="text-[11px] text-slate-500 text-center py-2">Nenhum rascunho pendente.</p>`;
+                return;
+            }
+
+            container.innerHTML = "";
+            chaves.sort((a,b) => Number(b) - Number(a)).forEach(key => {
+                const r = rascunhos[key];
+                const isAtual = Number(key) === numeroPedidoAtual;
+                const totalItens = (r.itens || []).reduce((acc, i) => acc + i.qtd, 0);
+
+                let div = document.createElement('div');
+                div.onclick = () => selecionarRascunho(key);
+                div.className = `flex justify-between items-center p-2 rounded-xl text-xs cursor-pointer border transition ${isAtual ? 'bg-slate-800 border-amber-500 text-amber-400' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'}`;
+                
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono font-bold">#${String(r.numero).padStart(4, '0')}</span>
+                        <span class="truncate max-w-[120px] text-slate-400">${r.fornecedor || 'Sem Fornecedor'}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-slate-400">${totalItens} itens</span>
+                        <button onclick="excluirRascunho('${key}', event)" class="text-slate-500 hover:text-rose-400 p-1">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        btnScan.addEventListener('click', () => {
+            if (isScanning) {
+                html5QrCode.stop().then(() => { 
+                    isScanning = false; 
+                    btnScan.innerText = "Escanear Código"; 
+                    btnScan.classList.replace('bg-rose-600', 'bg-amber-500');
+                    btnScan.classList.replace('text-white', 'text-slate-950');
+                });
+            } else {
+                html5QrCode = new Html5Qrcode("reader");
+                const config = { fps: 20, qrbox: { width: 280, height: 120 }, aspectRatio: 1.777778 };
+
+                html5QrCode.start({ facingMode: "environment" }, config, (text) => {
+                    html5QrCode.stop().then(() => {
+                        isScanning = false; 
+                        btnScan.innerText = "Escanear Código";
+                        btnScan.classList.replace('bg-rose-600', 'bg-amber-500');
+                        btnScan.classList.replace('text-slate-950', 'text-white');
+                        buscar(text.trim());
+                    });
+                }, () => {}).then(() => { 
+                    isScanning = true; 
+                    btnScan.innerText = "Parar Câmera"; 
+                    btnScan.classList.replace('bg-amber-500', 'bg-rose-600');
+                    btnScan.classList.replace('text-slate-950', 'text-white');
+                }).catch(err => {
+                    alert("Erro ao iniciar câmera: " + err);
+                });
+            }
+        });
+
+        formManual.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const termo = inputSearch.value.trim();
+            if (termo) buscar(termo);
+        });
+
+        btnFecharModal.addEventListener('click', () => {
+            modalCadastro.classList.add('hidden');
+        });
+
+        async function buscar(termo) {
+            statusAlert.innerText = `Buscando "${termo}"...`;
+            statusAlert.className = "p-2 rounded-xl text-xs text-center bg-slate-900 text-amber-400 border border-slate-800";
+            statusAlert.classList.remove('hidden');
+
+            try {
+                const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
+                if (error) throw error;
+
+                let produtosMap = {};
+                categoriasEncontradas.clear();
+                const termoUpper = termo.toUpperCase();
+
+                const regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
+                if (regEstoque && regEstoque.data) {
+                    for (let k in regEstoque.data) {
+                        let item = regEstoque.data[k];
+                        let ean = item.ean ? String(item.ean).trim() : '';
+                        let nome = item.produto ? String(item.produto).trim().toUpperCase() : '';
+
+                        if (item.categoria) categoriasEncontradas.add(item.categoria);
+                        if (!ean || ean === '' || ean === '0') continue;
+
+                        if (ean.includes(termo) || nome.includes(termoUpper)) {
+                            let key = ean;
+                            if (!produtosMap[key]) produtosMap[key] = { codigo: ean, descricao: item.produto, categoria: item.categoria || 'GERAL', custo: item.custo || 0 };
+                        }
+                    }
+                }
+
+                const regVendas = cloudData.find(d => d.id === 'vendas');
+                if (regVendas && regVendas.data) {
+                    regVendas.data.forEach(v => {
+                        let ean = v.ean ? String(v.ean).trim() : '';
+                        let nome = v.produto ? String(v.produto).trim().toUpperCase() : '';
+
+                        if (v.categoria) categoriasEncontradas.add(v.categoria);
+                        if (!ean || ean === '' || ean === '0') return;
+
+                        if (ean.includes(termo) || nome.includes(termoUpper)) {
+                            let key = ean;
+                            if (!produtosMap[key]) produtosMap[key] = { codigo: ean, descricao: v.produto, categoria: v.categoria || 'GERAL', custo: 0 };
+                        }
+                    });
+                }
+
+                const lista = Object.values(produtosMap);
+                if (lista.length === 0) {
+                    statusAlert.classList.add('hidden');
+                    resultsContainer.innerHTML = "";
+                    abrirModalCadastro(termo);
+                    return;
+                }
+
+                statusAlert.classList.add('hidden');
+                resultsContainer.innerHTML = "";
+
+                lista.forEach(info => {
+                    let clientMap = {}, cdTotal = 0, lojaTotalSum = 0;
+
+                    if (regEstoque && regEstoque.data) {
+                        for (let k in regEstoque.data) {
+                            let item = regEstoque.data[k];
+                            let itemEan = item.ean ? String(item.ean).trim() : '';
+                            if (itemEan === info.codigo) {
+                                let cliente = (item.cliente || 'Geral').trim();
+                                let qtd = Number(item.estoque) || 0;
+
+                                if (cliente.toUpperCase().startsWith('CD')) {
+                                    cdTotal += qtd;
+                                } else {
+                                    if (!clientMap[cliente]) clientMap[cliente] = { estoque: 0, preco: 0 };
+                                    clientMap[cliente].estoque += qtd;
+                                    lojaTotalSum += qtd;
+                                }
+                            }
+                        }
+                    }
+
+                    if (regVendas && regVendas.data) {
+                        regVendas.data.forEach(v => {
+                            let vEan = v.ean ? String(v.ean).trim() : '';
+                            if (vEan === info.codigo) {
+                                let cliente = (v.cliente || 'Geral').trim();
+                                let preco = parseFloat(v.vlrUnit || 0);
+                                if (!clientMap[cliente]) {
+                                    clientMap[cliente] = { estoque: 0, preco: preco };
+                                } else {
+                                    clientMap[cliente].preco = preco;
+                                }
+                            }
+                        });
+                    }
+
+                    let estoqueGeralTotal = lojaTotalSum + cdTotal;
+
+                    let lojasHtml = "";
+                    Object.keys(clientMap).sort().forEach(cli => {
+                        let dados = clientMap[cli];
+                        let est = dados.estoque || 0;
+                        let prc = dados.preco > 0 ? dados.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
+                        lojasHtml += `<tr class="border-b border-slate-800"><td class="p-2">${cli}</td><td class="p-2 text-right text-emerald-400">${prc}</td><td class="p-2 text-center">${est}</td><td class="p-2 text-center text-blue-400">${cdTotal}</td></tr>`;
+                    });
+
+                    let card = document.createElement('div');
+                    card.className = "bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3 shadow-xl";
+                    card.innerHTML = `
+                        <h2 class="font-bold text-white text-sm">${info.descricao}</h2>
+                        <div class="text-[10px] text-amber-400">EAN: ${info.codigo} | Cat: ${info.categoria}</div>
+                        <div class="text-[11px] bg-slate-950 p-2 rounded-xl border border-slate-800 flex justify-around text-slate-300 font-mono">
+                            <span>Estq. Loja: <strong class="text-white">${lojaTotalSum}</strong></span>
+                            <span>Estq. CD: <strong class="text-blue-400">${cdTotal}</strong></span>
+                            <span>Total: <strong class="text-amber-400">${estoqueGeralTotal}</strong></span>
+                        </div>
+                        <table class="w-full text-xs text-left">
+                            <tr class="text-slate-400 border-b border-slate-800"><th class="p-2">Loja/Filial</th><th class="p-2 text-right">Preço</th><th class="p-2 text-center">Loja</th><th class="p-2 text-center">CD</th></tr>
+                            ${lojasHtml || '<tr><td colspan="4" class="p-2 text-center text-slate-500">Sem dados por filial</td></tr>'}
+                        </table>
+                        
+                        <!-- ENTRADA DE NOTA COM TOTAL POR LINHA -->
+                        <div class="pt-2 border-t border-slate-800/80 space-y-2">
+                            <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider block"><i class="fa-solid fa-cart-plus mr-1"></i> Compras / Nota de Entrada</span>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-[10px] text-slate-400 block mb-1">Qtd Comprada</label>
+                                    <input type="number" id="qtd-entrada-${info.codigo}" min="1" placeholder="0" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] text-slate-400 block mb-1">Preço Custo (R$)</label>
+                                    <input type="number" step="0.01" id="custo-entrada-${info.codigo}" placeholder="0.00" value="${info.custo || ''}" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                </div>
+                            </div>
+                            
+                            <!-- TOTAL POR LINHA -->
+                            <div class="flex justify-between items-center bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 text-xs">
+                                <span class="text-slate-400">Total desta linha:</span>
+                                <span id="total-linha-${info.codigo}" class="font-mono font-bold text-amber-400">R$ 0,00</span>
+                            </div>
+
+                            <button onclick="adicionarAoPedido('${info.codigo}', '${info.descricao.replace(/'/g, "\\'")}', '${info.categoria}')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-xl text-xs transition">
+                                Adicionar ao Pedido
+                            </button>
+                        </div>
+                    `;
+                    resultsContainer.appendChild(card);
+                });
+
+            } catch (err) {
+                statusAlert.innerText = "Erro ao consultar: " + err.message;
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-950 text-rose-300 border border-rose-800";
+            }
+        }
+
+        function calcularTotalLinha(codigoEan) {
+            const qtd = parseFloat(document.getElementById(`qtd-entrada-${codigoEan}`).value) || 0;
+            const custo = parseFloat(document.getElementById(`custo-entrada-${codigoEan}`).value) || 0;
+            const subtotal = qtd * custo;
+            document.getElementById(`total-linha-${codigoEan}`).innerText = subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function adicionarAoPedido(codigo, descricao, categoria) {
+            const inputQtd = document.getElementById(`qtd-entrada-${codigo}`);
+            const inputCusto = document.getElementById(`custo-entrada-${codigo}`);
+
+            const qtd = Number(inputQtd.value);
+            const custo = parseFloat(inputCusto.value);
+
+            if (!qtd || qtd <= 0) {
+                alert("Informe uma quantidade válida.");
+                return;
+            }
+            if (isNaN(custo) || custo < 0) {
+                alert("Informe um preço de custo válido.");
+                return;
+            }
+
+            const subtotal = qtd * custo;
+            const indexExistente = itensPedido.findIndex(i => i.codigo === codigo);
+
+            if (indexExistente >= 0) {
+                itensPedido[indexExistente].qtd += qtd;
+                itensPedido[indexExistente].custo = custo;
+                itensPedido[indexExistente].subtotal = itensPedido[indexExistente].qtd * custo;
+            } else {
+                itensPedido.push({ codigo, descricao, categoria, qtd, custo, subtotal });
+            }
+
+            inputQtd.value = '';
+            document.getElementById(`total-linha-${codigo}`).innerText = "R$ 0,00";
+            salvarEstadoPedidoAtual();
+            atualizarInterfacePedido();
+        }
+
+        function removerDoPedido(codigo) {
+            itensPedido = itensPedido.filter(i => i.codigo !== codigo);
+            salvarEstadoPedidoAtual();
+            atualizarInterfacePedido();
+        }
+
+        function limparPedido() {
+            if (itensPedido.length === 0 && !document.getElementById('input-fornecedor').value) return;
+            if (confirm("Deseja realmente limpar todos os itens do pedido em edição?")) {
+                itensPedido = [];
+                document.getElementById('input-fornecedor').value = '';
+                salvarEstadoPedidoAtual();
+                atualizarInterfacePedido();
+            }
+        }
+
+        function atualizarInterfacePedido() {
+            const container = document.getElementById('lista-pedido');
+            const totalElement = document.getElementById('total-geral-pedido');
+
+            if (itensPedido.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">Nenhum item adicionado ao pedido.</p>`;
+                totalElement.innerText = "R$ 0,00";
+                return;
+            }
+
+            container.innerHTML = "";
+            let totalGeral = 0;
+
+            itensPedido.forEach(item => {
+                totalGeral += item.subtotal;
+                let div = document.createElement('div');
+                div.className = "flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs";
+                div.innerHTML = `
+                    <div class="flex-1 pr-2">
+                        <div class="font-bold text-white truncate max-w-[190px]">${item.descricao}</div>
+                        <div class="text-[10px] text-slate-400">
+                            EAN: ${item.codigo} | ${item.qtd}x ${item.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-mono font-bold text-amber-400">${item.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        <button onclick="removerDoPedido('${item.codigo}')" class="text-slate-500 hover:text-rose-400 p-1" title="Excluir item">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            totalElement.innerText = totalGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function abrirModalCadastro(termo) {
+            const isEan = /^\d+$/.test(termo);
+            document.getElementById('cad-ean').value = isEan ? termo : '';
+            document.getElementById('cad-descricao').value = !isEan ? termo : '';
+            document.getElementById('cad-qtd').value = 1;
+            document.getElementById('cad-custo').value = '';
+
+            const selectCat = document.getElementById('cad-categoria');
+            selectCat.innerHTML = '';
+            
+            if (categoriasEncontradas.size === 0) {
+                categoriasEncontradas.add('GERAL');
+                categoriasEncontradas.add('BEBIDAS');
+                categoriasEncontradas.add('ALIMENTOS');
+                categoriasEncontradas.add('CONVENIENCIA');
+            }
+
+            categoriasEncontradas.forEach(cat => {
+                let opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                selectCat.appendChild(opt);
+            });
+
+            modalCadastro.classList.remove('hidden');
+        }
+
+        formCadastrarProduto.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const ean = document.getElementById('cad-ean').value.trim();
+            const produto = document.getElementById('cad-descricao').value.trim();
+            const categoria = document.getElementById('cad-categoria').value;
+            const qtd = Number(document.getElementById('cad-qtd').value);
+            const custo = parseFloat(document.getElementById('cad-custo').value);
+
+            try {
+                const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
+                if (error) throw error;
+
+                let regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
+                let estoqueData = regEstoque ? (regEstoque.data || {}) : {};
+                
+                let novoKey = "ITEM_" + Date.now();
+                estoqueData[novoKey] = {
+                    ean: ean,
+                    produto: produto,
+                    categoria: categoria,
+                    estoque: 0,
+                    custo: custo,
+                    cliente: 'Geral'
+                };
+
+                const { error: saveError } = await supabaseClient
+                    .from('nexxa_store')
+                    .update({ data: estoqueData })
+                    .eq('id', regEstoque.id);
+
+                if (saveError) throw saveError;
+
+                modalCadastro.classList.add('hidden');
+                adicionarAoPedido(ean, produto, categoria, qtd, custo);
+                alert("Produto cadastrado e adicionado à lista de compras!");
+                buscar(ean);
+
+            } catch (err) {
+                alert("Erro ao cadastrar produto: " + err.message);
+            }
+        });
+
+        async function finalizarPedidoEntrada() {
+            if (itensPedido.length === 0) {
+                alert("Adicione pelo menos um item ao pedido antes de finalizar.");
+                return;
+            }
+
+            const fornecedor = document.getElementById('input-fornecedor').value.trim();
+            if (!fornecedor) {
+                alert("Por favor, informe o nome do fornecedor.");
+                document.getElementById('input-fornecedor').focus();
+                return;
+            }
+
+            try {
+                const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
+                if (error) throw error;
+
+                let regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
+                if (!regEstoque) throw new Error("Registro de estoque não encontrado.");
+
+                let estoqueData = regEstoque.data || {};
+
+                itensPedido.forEach(itemPedido => {
+                    let encontrado = false;
+                    for (let k in estoqueData) {
+                        let item = estoqueData[k];
+                        if (String(item.ean).trim() === itemPedido.codigo) {
+                            item.estoque = (Number(item.estoque) || 0) + itemPedido.qtd;
+                            item.custo = itemPedido.custo;
+                            item.fornecedor = fornecedor;
+                            encontrado = true;
+                            break;
+                        }
+                    }
+
+                    if (!encontrado) {
+                        let novoKey = "ITEM_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+                        estoqueData[novoKey] = {
+                            ean: itemPedido.codigo,
+                            produto: itemPedido.descricao,
+                            categoria: itemPedido.categoria,
+                            estoque: itemPedido.qtd,
+                            custo: itemPedido.custo,
+                            fornecedor: fornecedor,
+                            cliente: 'Geral'
+                        };
+                    }
+                });
+
+                const { error: updateError } = await supabaseClient
+                    .from('nexxa_store')
+                    .update({ data: estoqueData })
+                    .eq('id', regEstoque.id);
+
+                if (updateError) throw updateError;
+
+                const numAtual = String(numeroPedidoAtual).padStart(4, '0');
+                alert(`Nota de Entrada #${numAtual} do fornecedor "${fornecedor}" finalizada com sucesso!`);
+                
+                // Remove dos rascunhos pendentes
+                delete rascunhos[String(numeroPedidoAtual)];
+                localStorage.setItem('nexxa_rascunhos_pedidos', JSON.stringify(rascunhos));
+
+                // Incrementa a numeração sequencial do próximo pedido
+                numeroPedidoAtual++;
+                localStorage.setItem('nexxa_num_pedido', numeroPedidoAtual);
+
+                itensPedido = [];
+                document.getElementById('input-fornecedor').value = '';
+                
+                carregarPedidoAtual();
+                atualizarListaPendentes();
+                resultsContainer.innerHTML = "";
+
+            } catch (err) {
+                alert("Erro ao finalizar nota de entrada: " + err.message);
+            }
+        }
+    </script>
+</body>
+</html>
