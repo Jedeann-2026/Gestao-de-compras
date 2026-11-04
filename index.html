@@ -161,7 +161,7 @@
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let html5QrCode = null, isScanning = false;
-        let regEstoque = null, regVendas = null;
+        let regEstoque = null, regVendas = null, regEntradasBase = null;
         let isDataLoaded = false;
         let categoriasEncontradas = new Set();
         let itensPedido = [];
@@ -188,6 +188,7 @@
 
                 regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
                 regVendas = cloudData.find(d => d.id === 'vendas');
+                regEntradasBase = cloudData.find(d => d.id === 'entradas');
                 isDataLoaded = true;
                 
                 statusAlert.classList.add('hidden');
@@ -199,6 +200,7 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             carregarDadosMemoria();
+            numeroPedidoAtual = obterProximoNumeroLivre();
             carregarPedidoAtual();
             atualizarListaPendentes();
         });
@@ -207,6 +209,14 @@
             if (ultimoTermoPesquisado) {
                 buscar(ultimoTermoPesquisado, false);
             }
+        }
+
+        function obterProximoNumeroLivre() {
+            let prox = Number(localStorage.getItem('nexxa_num_pedido') || 1);
+            while (rascunhos[String(prox)]) {
+                prox++;
+            }
+            return prox;
         }
 
         function atualizarNumeroPedidoBadge() {
@@ -252,11 +262,7 @@
         }
 
         function novoPedidoRascunho() {
-            let proxNum = 1;
-            while (rascunhos[String(proxNum)]) {
-                proxNum++;
-            }
-            numeroPedidoAtual = Math.max(proxNum, Number(localStorage.getItem('nexxa_num_pedido') || 1));
+            numeroPedidoAtual = obterProximoNumeroLivre();
             carregarPedidoAtual();
         }
 
@@ -308,7 +314,32 @@
             });
         }
 
-        // FUNÇÃO DE EXPORTAÇÃO EXCEL NATIVA
+        // BUSCA O ÚLTIMO PREÇO DE COMPRA NAS NOTAS GRAVADAS NO SUPABASE (Retorna 0 se não encontrar)
+        function obterUltimoPrecoCompra(eanAlvo) {
+            if (!regEntradasBase || !regEntradasBase.data) return 0;
+
+            let notas = regEntradasBase.data;
+            let ultimaData = 0;
+            let ultimoPreco = 0;
+
+            for (let k in notas) {
+                let nota = notas[k];
+                if (nota && nota.itens && Array.isArray(nota.itens)) {
+                    nota.itens.forEach(item => {
+                        if (String(item.codigo).trim() === String(eanAlvo).trim()) {
+                            let dataNota = nota.dataFinalizacao ? new Date(nota.dataFinalizacao).getTime() : 0;
+                            if (dataNota >= ultimaData) {
+                                ultimaData = dataNota;
+                                ultimoPreco = Number(item.custo) || 0;
+                            }
+                        }
+                    });
+                }
+            }
+            return ultimoPreco;
+        }
+
+        // EXPORTAÇÃO EXCEL
         function exportarPedidoExcel() {
             if (itensPedido.length === 0) {
                 alert("Não existem itens no pedido para exportar.");
@@ -572,7 +603,6 @@
 
                 let estoqueGeralTotal = lojaTotalSum + cdTotal;
                 
-                // Sugestão de Compras (Aparece APENAS se for positivo)
                 let sugestaoCompras = qtdVendidaGeral - estoqueGeralTotal;
                 let sugestaoHtml = sugestaoCompras > 0 ? `
                     <div class="flex justify-between font-mono text-amber-400 pt-1 border-t border-emerald-900/40">
@@ -580,6 +610,17 @@
                         <strong>+${sugestaoCompras} un</strong>
                     </div>
                 ` : '';
+
+                // Sempre exibe o último preço de compra (mesmo que zerado)
+                let ultimoPrecoCompra = obterUltimoPrecoCompra(info.codigo);
+                let ultimoPrecoHtml = `
+                    <div class="flex justify-between font-mono text-cyan-400 pt-1 border-t border-emerald-900/40">
+                        <span>Último Preço Custo:</span>
+                        <strong>${Number(ultimoPrecoCompra).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+                    </div>
+                `;
+
+                let custoSugerido = ultimoPrecoCompra > 0 ? ultimoPrecoCompra : (info.custo || '');
 
                 let todasLojasSet = new Set([...Object.keys(clientMap), ...Object.keys(vendasPorLojaMap)]);
 
@@ -610,7 +651,6 @@
                         <span>Total: <strong class="text-amber-400">${estoqueGeralTotal}</strong></span>
                     </div>
 
-                    <!-- RESUMO DE VENDAS NO PERÍODO E SUGESTÃO DE COMPRAS (CONDICIONAL POSITIVA) -->
                     <div class="bg-emerald-950/40 border border-emerald-900/60 p-2.5 rounded-xl text-xs space-y-1">
                         <div class="text-[10px] text-emerald-400 font-bold uppercase"><i class="fa-solid fa-chart-pie mr-1"></i> Resumo de Vendas (Período)</div>
                         <div class="flex justify-between font-mono">
@@ -618,6 +658,7 @@
                             <span>Total Faturado: <strong class="text-emerald-400">${totalVendidoGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></span>
                         </div>
                         ${sugestaoHtml}
+                        ${ultimoPrecoHtml}
                     </div>
 
                     <div class="space-y-1">
@@ -648,7 +689,7 @@
                             </div>
                             <div>
                                 <label class="text-[10px] text-slate-400 block mb-1">Preço Custo (R$)</label>
-                                <input type="number" step="0.01" id="custo-entrada-${info.codigo}" placeholder="0.00" value="${info.custo || ''}" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+                                <input type="number" step="0.01" id="custo-entrada-${info.codigo}" placeholder="0.00" value="${custoSugerido}" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
                             </div>
                         </div>
                         
@@ -832,14 +873,12 @@
 
                 if (saveError) throw saveError;
 
-                // Atualiza a memória local para refletir o novo produto imediatamente
                 if (regEstoque) {
                     regEstoque.data = estoqueData;
                 }
 
                 modalCadastro.classList.add('hidden');
                 
-                // Adiciona o produto cadastrado ao pedido de compras
                 adicionarNovoProdutoAoPedido(ean, produto, categoria, qtd, custo);
                 
                 alert("Produto cadastrado e adicionado ao pedido com sucesso!");
@@ -906,13 +945,40 @@
 
                 if (updateError) throw updateError;
 
+                let regEntradas = cloudData.find(d => d.id === 'entradas');
+                let entradasData = regEntradas ? (regEntradas.data || {}) : {};
+
+                const numAtualStr = String(numeroPedidoAtual).padStart(4, '0');
+                const notaKey = "NOTA_" + Date.now();
+
+                entradasData[notaKey] = {
+                    numeroPedido: numAtualStr,
+                    fornecedor: fornecedor,
+                    dataFinalizacao: new Date().toISOString(),
+                    itens: itensPedido,
+                    totalGeral: itensPedido.reduce((acc, i) => acc + i.subtotal, 0)
+                };
+
+                if (regEntradas) {
+                    await supabaseClient
+                        .from('nexxa_store')
+                        .update({ data: entradasData })
+                        .eq('id', 'entradas');
+                } else {
+                    await supabaseClient
+                        .from('nexxa_store')
+                        .insert([{ id: 'entradas', data: entradasData }]);
+                }
+
+                regEntradasBase = { id: 'entradas', data: entradasData };
+
                 const numAtual = String(numeroPedidoAtual).padStart(4, '0');
-                alert(`Nota de Entrada #${numAtual} do fornecedor "${fornecedor}" finalizada com sucesso!`);
+                alert(`Nota de Entrada #${numAtual} do fornecedor "${fornecedor}" finalizada e salva no ID 'entradas' do Supabase com sucesso!`);
                 
                 delete rascunhos[String(numeroPedidoAtual)];
                 localStorage.setItem('nexxa_rascunhos_pedidos', JSON.stringify(rascunhos));
 
-                numeroPedidoAtual++;
+                numeroPedidoAtual = obterProximoNumeroLivre();
                 localStorage.setItem('nexxa_num_pedido', numeroPedidoAtual);
 
                 itensPedido = [];
