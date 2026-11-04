@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- LIB PARA EXPORTAÇÃO EXCEL NATIVA -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         #reader video { object-fit: cover !important; border-radius: 0.75rem; }
     </style>
@@ -77,9 +79,14 @@
                     </h2>
                     <span id="num-pedido-badge" class="bg-slate-800 text-amber-400 text-[10px] font-mono px-2 py-0.5 rounded-full border border-slate-700">#0001</span>
                 </div>
-                <button onclick="limparPedido()" class="text-[11px] text-rose-400 hover:text-rose-300 transition">
-                    <i class="fa-solid fa-trash-can mr-1"></i>Limpar
-                </button>
+                <div class="flex items-center gap-3">
+                    <button onclick="exportarPedidoExcel()" class="text-[11px] text-emerald-400 hover:text-emerald-300 transition flex items-center gap-1 font-semibold">
+                        <i class="fa-solid fa-file-excel"></i>Exportar
+                    </button>
+                    <button onclick="limparPedido()" class="text-[11px] text-rose-400 hover:text-rose-300 transition">
+                        <i class="fa-solid fa-trash-can mr-1"></i>Limpar
+                    </button>
+                </div>
             </div>
 
             <!-- CAMPO DE FORNECEDOR -->
@@ -98,9 +105,11 @@
                 <span id="total-geral-pedido" class="text-base font-bold text-emerald-400">R$ 0,00</span>
             </div>
 
-            <button onclick="finalizarPedidoEntrada()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg">
-                <i class="fa-solid fa-circle-check mr-1"></i> Finalizar Nota de Entrada
-            </button>
+            <div class="grid grid-cols-1 gap-2">
+                <button onclick="finalizarPedidoEntrada()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg">
+                    <i class="fa-solid fa-circle-check mr-1"></i> Finalizar Nota de Entrada
+                </button>
+            </div>
         </div>
     </div>
 
@@ -152,6 +161,8 @@
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let html5QrCode = null, isScanning = false;
+        let regEstoque = null, regVendas = null;
+        let isDataLoaded = false;
         let categoriasEncontradas = new Set();
         let itensPedido = [];
         let rascunhos = JSON.parse(localStorage.getItem('nexxa_rascunhos_pedidos') || '{}');
@@ -170,7 +181,24 @@
         const btnFecharModal = document.getElementById('btn-fechar-modal');
         const formCadastrarProduto = document.getElementById('form-cadastrar-produto');
 
-        document.addEventListener('DOMContentLoaded', () => {
+        async function carregarDadosMemoria() {
+            try {
+                const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
+                if (error) throw error;
+
+                regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
+                regVendas = cloudData.find(d => d.id === 'vendas');
+                isDataLoaded = true;
+                
+                statusAlert.classList.add('hidden');
+            } catch (err) {
+                statusAlert.innerText = "Erro ao carregar dados: " + err.message;
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-950 text-rose-300 border border-rose-800";
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            carregarDadosMemoria();
             carregarPedidoAtual();
             atualizarListaPendentes();
         });
@@ -280,6 +308,56 @@
             });
         }
 
+        // FUNÇÃO DE EXPORTAÇÃO EXCEL NATIVA
+        function exportarPedidoExcel() {
+            if (itensPedido.length === 0) {
+                alert("Não existem itens no pedido para exportar.");
+                return;
+            }
+
+            const fornecedor = document.getElementById('input-fornecedor').value.trim() || 'Não informado';
+            const numPedidoFormatted = String(numeroPedidoAtual).padStart(4, '0');
+
+            let dadosExcel = [];
+            dadosExcel.push(["PEDIDO DE COMPRAS", `#${numPedidoFormatted}`]);
+            dadosExcel.push(["FORNECEDOR", fornecedor]);
+            dadosExcel.push(["DATA EXPORTAÇÃO", new Date().toLocaleDateString('pt-BR')]);
+            dadosExcel.push([]);
+            dadosExcel.push(["EAN", "Descrição do Produto", "Categoria", "Qtd Comprada", "Preço Custo (R$)", "Subtotal (R$)"]);
+
+            let totalGeral = 0;
+            itensPedido.forEach(item => {
+                totalGeral += item.subtotal;
+                dadosExcel.push([
+                    item.codigo,
+                    item.descricao,
+                    item.categoria || 'GERAL',
+                    item.qtd,
+                    item.custo,
+                    item.subtotal
+                ]);
+            });
+
+            dadosExcel.push([]);
+            dadosExcel.push(["", "", "", "", "TOTAL GERAL:", totalGeral]);
+
+            const worksheet = XLSX.utils.aoa_to_sheet(dadosExcel);
+            worksheet['!cols'] = [
+                { wch: 16 },
+                { wch: 35 },
+                { wch: 18 },
+                { wch: 14 },
+                { wch: 18 },
+                { wch: 18 }
+            ];
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, `Pedido #${numPedidoFormatted}`);
+
+            const nomeArquivo = `Pedido_Compras_${numPedidoFormatted}_${fornecedor.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+            XLSX.writeFile(workbook, nomeArquivo);
+        }
+
         // CONTROLO DE CÂMARA COM DESTRUÇÃO COMPLETA DE RECURSOS
         btnScan.addEventListener('click', async () => {
             if (isScanning) {
@@ -297,7 +375,7 @@
 
             const config = { 
                 fps: 25, 
-                qrbox: { width: 280, height: 120 }, 
+                qrbox: { width: 280, height: 120 },
                 aspectRatio: 1.777778,
                 formatsToSupport: [
                     Html5QrcodeSupportedFormats.EAN_13,
@@ -327,7 +405,9 @@
 
             } catch (err) {
                 console.error("Erro ao iniciar câmara:", err);
-                alert("Erro ao iniciar câmera. Verifique as permissões.");
+                statusAlert.innerText = "Erro na câmara. Verifique as permissões.";
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-950 text-rose-300 border border-rose-800";
+                statusAlert.classList.remove('hidden');
                 isScanning = false;
                 btnScan.innerText = "Escanear Código";
             }
@@ -366,217 +446,224 @@
             modalCadastro.classList.add('hidden');
         });
 
-        async function buscar(termo, exibirAlerta = true) {
+        function buscar(termo, exibirAlerta = true) {
             ultimoTermoPesquisado = termo;
+            if (!isDataLoaded) {
+                statusAlert.innerText = "Aguarde, dados ainda sendo carregados...";
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-amber-950 text-amber-300 border border-amber-800";
+                statusAlert.classList.remove('hidden');
+                return;
+            }
+
             if (exibirAlerta) {
                 statusAlert.innerText = `Buscando "${termo}"...`;
                 statusAlert.className = "p-2 rounded-xl text-xs text-center bg-slate-900 text-amber-400 border border-slate-800";
                 statusAlert.classList.remove('hidden');
             }
 
-            try {
-                const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
-                if (error) throw error;
+            let produtosMap = {};
+            categoriasEncontradas.clear();
+            const termoUpper = termo.toUpperCase();
 
-                let produtosMap = {};
-                categoriasEncontradas.clear();
-                const termoUpper = termo.toUpperCase();
+            if (regEstoque && regEstoque.data) {
+                for (let k in regEstoque.data) {
+                    let item = regEstoque.data[k];
+                    let ean = item.ean ? String(item.ean).trim() : '';
+                    let nome = item.produto ? String(item.produto).trim().toUpperCase() : '';
 
-                const regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
+                    if (item.categoria) categoriasEncontradas.add(item.categoria);
+                    if (!ean || ean === '' || ean === '0') continue;
+
+                    if (ean.includes(termo) || nome.includes(termoUpper)) {
+                        let key = ean;
+                        if (!produtosMap[key]) produtosMap[key] = { codigo: ean, descricao: item.produto, categoria: item.categoria || 'GERAL', custo: item.custo || 0 };
+                    }
+                }
+            }
+
+            if (regVendas && regVendas.data) {
+                regVendas.data.forEach(v => {
+                    let ean = v.ean ? String(v.ean).trim() : '';
+                    let nome = v.produto ? String(v.produto).trim().toUpperCase() : '';
+
+                    if (v.categoria) categoriasEncontradas.add(v.categoria);
+                    if (!ean || ean === '' || ean === '0') return;
+
+                    if (ean.includes(termo) || nome.includes(termoUpper)) {
+                        let key = ean;
+                        if (!produtosMap[key]) produtosMap[key] = { codigo: ean, descricao: v.produto, categoria: v.categoria || 'GERAL', custo: 0 };
+                    }
+                });
+            }
+
+            const lista = Object.values(produtosMap);
+            if (lista.length === 0) {
+                statusAlert.classList.add('hidden');
+                resultsContainer.innerHTML = "";
+                if (exibirAlerta) abrirModalCadastro(termo);
+                return;
+            }
+
+            statusAlert.classList.add('hidden');
+            resultsContainer.innerHTML = "";
+
+            const dataInicioVal = filtroInicio.value ? new Date(filtroInicio.value + 'T00:00:00') : null;
+            const dataFimVal = filtroFim.value ? new Date(filtroFim.value + 'T23:59:59') : null;
+
+            lista.forEach(info => {
+                let clientMap = {}, cdTotal = 0, lojaTotalSum = 0;
+                let vendasPorLojaMap = {};
+                let totalVendidoGeral = 0;
+                let qtdVendidaGeral = 0;
+
                 if (regEstoque && regEstoque.data) {
                     for (let k in regEstoque.data) {
                         let item = regEstoque.data[k];
-                        let ean = item.ean ? String(item.ean).trim() : '';
-                        let nome = item.produto ? String(item.produto).trim().toUpperCase() : '';
+                        let itemEan = item.ean ? String(item.ean).trim() : '';
+                        if (itemEan === info.codigo) {
+                            let cliente = (item.cliente || 'Geral').trim();
+                            let qtd = Number(item.estoque) || 0;
 
-                        if (item.categoria) categoriasEncontradas.add(item.categoria);
-                        if (!ean || ean === '' || ean === '0') continue;
-
-                        if (ean.includes(termo) || nome.includes(termoUpper)) {
-                            let key = ean;
-                            if (!produtosMap[key]) produtosMap[key] = { codigo: ean, descricao: item.produto, categoria: item.categoria || 'GERAL', custo: item.custo || 0 };
+                            if (cliente.toUpperCase().startsWith('CD')) {
+                                cdTotal += qtd;
+                            } else {
+                                if (!clientMap[cliente]) clientMap[cliente] = { estoque: 0, preco: 0 };
+                                clientMap[cliente].estoque += qtd;
+                                lojaTotalSum += qtd;
+                            }
                         }
                     }
                 }
 
-                const regVendas = cloudData.find(d => d.id === 'vendas');
                 if (regVendas && regVendas.data) {
                     regVendas.data.forEach(v => {
-                        let ean = v.ean ? String(v.ean).trim() : '';
-                        let nome = v.produto ? String(v.produto).trim().toUpperCase() : '';
+                        let vEan = v.ean ? String(v.ean).trim() : '';
+                        if (vEan === info.codigo) {
+                            let dataVendaStr = v.data || v.dataVenda || v.created_at || '';
+                            if (dataInicioVal || dataFimVal) {
+                                if (!dataVendaStr) return;
+                                let dataVendaObj = new Date(dataVendaStr);
+                                if (isNaN(dataVendaObj)) return;
+                                if (dataInicioVal && dataVendaObj < dataInicioVal) return;
+                                if (dataFimVal && dataVendaObj > dataFimVal) return;
+                            }
 
-                        if (v.categoria) categoriasEncontradas.add(v.categoria);
-                        if (!ean || ean === '' || ean === '0') return;
+                            let cliente = (v.cliente || v.loja || 'Geral').trim();
+                            let preco = parseFloat(v.vlrUnit || 0);
+                            let qtdV = Number(v.qtd || v.quantidade || 1);
+                            let totalLinha = qtdV * preco;
 
-                        if (ean.includes(termo) || nome.includes(termoUpper)) {
-                            let key = ean;
-                            if (!produtosMap[key]) produtosMap[key] = { codigo: ean, descricao: v.produto, categoria: v.categoria || 'GERAL', custo: 0 };
+                            totalVendidoGeral += totalLinha;
+                            qtdVendidaGeral += qtdV;
+
+                            if (!clientMap[cliente]) {
+                                clientMap[cliente] = { estoque: 0, preco: preco };
+                            } else {
+                                if (preco > 0) clientMap[cliente].preco = preco;
+                            }
+
+                            if (!vendasPorLojaMap[cliente]) {
+                                vendasPorLojaMap[cliente] = { qtdVenda: 0 };
+                            }
+                            vendasPorLojaMap[cliente].qtdVenda += qtdV;
                         }
                     });
                 }
 
-                const lista = Object.values(produtosMap);
-                if (lista.length === 0) {
-                    statusAlert.classList.add('hidden');
-                    resultsContainer.innerHTML = "";
-                    if (exibirAlerta) abrirModalCadastro(termo);
-                    return;
-                }
+                let estoqueGeralTotal = lojaTotalSum + cdTotal;
+                
+                // Sugestão de Compras (Aparece APENAS se for positivo)
+                let sugestaoCompras = qtdVendidaGeral - estoqueGeralTotal;
+                let sugestaoHtml = sugestaoCompras > 0 ? `
+                    <div class="flex justify-between font-mono text-amber-400 pt-1 border-t border-emerald-900/40">
+                        <span>Sugestão de Compras:</span>
+                        <strong>+${sugestaoCompras} un</strong>
+                    </div>
+                ` : '';
 
-                statusAlert.classList.add('hidden');
-                resultsContainer.innerHTML = "";
+                let todasLojasSet = new Set([...Object.keys(clientMap), ...Object.keys(vendasPorLojaMap)]);
 
-                const dataInicioVal = filtroInicio.value ? new Date(filtroInicio.value + 'T00:00:00') : null;
-                const dataFimVal = filtroFim.value ? new Date(filtroFim.value + 'T23:59:59') : null;
+                let detalhesLojaHtml = "";
+                Array.from(todasLojasSet).sort().forEach(loja => {
+                    let dadosLoja = clientMap[loja] || { estoque: 0, preco: 0 };
+                    let estLoja = dadosLoja.estoque || 0;
+                    let prcLoja = dadosLoja.preco > 0 ? dadosLoja.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
+                    let vendaLoja = vendasPorLojaMap[loja] ? vendasPorLojaMap[loja].qtdVenda : 0;
 
-                lista.forEach(info => {
-                    let clientMap = {}, cdTotal = 0, lojaTotalSum = 0;
-                    let vendasPorLojaMap = {};
-                    let totalVendidoGeral = 0;
-                    let qtdVendidaGeral = 0;
+                    detalhesLojaHtml += `
+                        <tr class="border-b border-slate-900 text-[11px]">
+                            <td class="p-1.5 font-medium">${loja}</td>
+                            <td class="p-1.5 text-right text-emerald-400">${prcLoja}</td>
+                            <td class="p-1.5 text-center text-amber-400 font-semibold">${estLoja}</td>
+                            <td class="p-1.5 text-center text-white font-bold">${vendaLoja} un</td>
+                        </tr>`;
+                });
 
-                    if (regEstoque && regEstoque.data) {
-                        for (let k in regEstoque.data) {
-                            let item = regEstoque.data[k];
-                            let itemEan = item.ean ? String(item.ean).trim() : '';
-                            if (itemEan === info.codigo) {
-                                let cliente = (item.cliente || 'Geral').trim();
-                                let qtd = Number(item.estoque) || 0;
+                let card = document.createElement('div');
+                card.className = "bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3 shadow-xl";
+                card.innerHTML = `
+                    <h2 class="font-bold text-white text-sm">${info.descricao}</h2>
+                    <div class="text-[10px] text-amber-400">EAN: ${info.codigo} | Cat: ${info.categoria}</div>
+                    <div class="text-[11px] bg-slate-950 p-2 rounded-xl border border-slate-800 flex justify-around text-slate-300 font-mono">
+                        <span>Estq. Loja: <strong class="text-white">${lojaTotalSum}</strong></span>
+                        <span>Estq. CD: <strong class="text-blue-400">${cdTotal}</strong></span>
+                        <span>Total: <strong class="text-amber-400">${estoqueGeralTotal}</strong></span>
+                    </div>
 
-                                if (cliente.toUpperCase().startsWith('CD')) {
-                                    cdTotal += qtd;
-                                } else {
-                                    if (!clientMap[cliente]) clientMap[cliente] = { estoque: 0, preco: 0 };
-                                    clientMap[cliente].estoque += qtd;
-                                    lojaTotalSum += qtd;
-                                }
-                            }
-                        }
-                    }
-
-                    if (regVendas && regVendas.data) {
-                        regVendas.data.forEach(v => {
-                            let vEan = v.ean ? String(v.ean).trim() : '';
-                            if (vEan === info.codigo) {
-                                let dataVendaStr = v.data || v.dataVenda || v.created_at || '';
-                                if (dataInicioVal || dataFimVal) {
-                                    if (!dataVendaStr) return;
-                                    let dataVendaObj = new Date(dataVendaStr);
-                                    if (isNaN(dataVendaObj)) return;
-                                    if (dataInicioVal && dataVendaObj < dataInicioVal) return;
-                                    if (dataFimVal && dataVendaObj > dataFimVal) return;
-                                }
-
-                                let cliente = (v.cliente || v.loja || 'Geral').trim();
-                                let preco = parseFloat(v.vlrUnit || 0);
-                                let qtdV = Number(v.qtd || v.quantidade || 1);
-                                let totalLinha = qtdV * preco;
-
-                                totalVendidoGeral += totalLinha;
-                                qtdVendidaGeral += qtdV;
-
-                                if (!clientMap[cliente]) {
-                                    clientMap[cliente] = { estoque: 0, preco: preco };
-                                } else {
-                                    if (preco > 0) clientMap[cliente].preco = preco;
-                                }
-
-                                if (!vendasPorLojaMap[cliente]) {
-                                    vendasPorLojaMap[cliente] = { qtdVenda: 0 };
-                                }
-                                vendasPorLojaMap[cliente].qtdVenda += qtdV;
-                            }
-                        });
-                    }
-
-                    let estoqueGeralTotal = lojaTotalSum + cdTotal;
-
-                    let todasLojasSet = new Set([...Object.keys(clientMap), ...Object.keys(vendasPorLojaMap)]);
-
-                    let detalhesLojaHtml = "";
-                    Array.from(todasLojasSet).sort().forEach(loja => {
-                        let dadosLoja = clientMap[loja] || { estoque: 0, preco: 0 };
-                        let estLoja = dadosLoja.estoque || 0;
-                        let prcLoja = dadosLoja.preco > 0 ? dadosLoja.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
-                        let vendaLoja = vendasPorLojaMap[loja] ? vendasPorLojaMap[loja].qtdVenda : 0;
-
-                        detalhesLojaHtml += `
-                            <tr class="border-b border-slate-900 text-[11px]">
-                                <td class="p-1.5 font-medium">${loja}</td>
-                                <td class="p-1.5 text-right text-emerald-400">${prcLoja}</td>
-                                <td class="p-1.5 text-center text-amber-400 font-semibold">${estLoja}</td>
-                                <td class="p-1.5 text-center text-white font-bold">${vendaLoja} un</td>
-                            </tr>`;
-                    });
-
-                    let card = document.createElement('div');
-                    card.className = "bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3 shadow-xl";
-                    card.innerHTML = `
-                        <h2 class="font-bold text-white text-sm">${info.descricao}</h2>
-                        <div class="text-[10px] text-amber-400">EAN: ${info.codigo} | Cat: ${info.categoria}</div>
-                        <div class="text-[11px] bg-slate-950 p-2 rounded-xl border border-slate-800 flex justify-around text-slate-300 font-mono">
-                            <span>Estq. Loja: <strong class="text-white">${lojaTotalSum}</strong></span>
-                            <span>Estq. CD: <strong class="text-blue-400">${cdTotal}</strong></span>
-                            <span>Total: <strong class="text-amber-400">${estoqueGeralTotal}</strong></span>
+                    <!-- RESUMO DE VENDAS NO PERÍODO E SUGESTÃO DE COMPRAS (CONDICIONAL POSITIVA) -->
+                    <div class="bg-emerald-950/40 border border-emerald-900/60 p-2.5 rounded-xl text-xs space-y-1">
+                        <div class="text-[10px] text-emerald-400 font-bold uppercase"><i class="fa-solid fa-chart-pie mr-1"></i> Resumo de Vendas (Período)</div>
+                        <div class="flex justify-between font-mono">
+                            <span>Qtd Vendida: <strong class="text-white">${qtdVendidaGeral} un</strong></span>
+                            <span>Total Faturado: <strong class="text-emerald-400">${totalVendidoGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></span>
                         </div>
+                        ${sugestaoHtml}
+                    </div>
 
-                        <div class="bg-emerald-950/40 border border-emerald-900/60 p-2.5 rounded-xl text-xs space-y-1">
-                            <div class="text-[10px] text-emerald-400 font-bold uppercase"><i class="fa-solid fa-chart-pie mr-1"></i> Resumo de Vendas (Período)</div>
-                            <div class="flex justify-between font-mono">
-                                <span>Qtd Vendida: <strong class="text-white">${qtdVendidaGeral} un</strong></span>
-                                <span>Total Faturado: <strong class="text-emerald-400">${totalVendidoGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></span>
+                    <div class="space-y-1">
+                        <div class="text-[11px] font-semibold text-slate-300"><i class="fa-solid fa-store mr-1"></i> Detalhes por Loja</div>
+                        <div class="max-h-44 overflow-y-auto border border-slate-800 rounded-xl bg-slate-950">
+                            <table class="w-full text-xs text-left">
+                                <thead class="text-slate-400 border-b border-slate-800 bg-slate-900/50 sticky top-0">
+                                    <tr>
+                                        <th class="p-1.5 text-[10px]">Loja/Filial</th>
+                                        <th class="p-1.5 text-[10px] text-right">Preço Venda</th>
+                                        <th class="p-1.5 text-[10px] text-center">Estq. Loja</th>
+                                        <th class="p-1.5 text-[10px] text-center">Qtd Vendida</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${detalhesLojaHtml || '<tr><td colspan="4" class="p-3 text-center text-slate-500">Nenhum dado encontrado</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="pt-2 border-t border-slate-800/80 space-y-2">
+                        <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider block"><i class="fa-solid fa-cart-plus mr-1"></i> Compras / Nota de Entrada</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-1">Qtd Comprada</label>
+                                <input type="number" id="qtd-entrada-${info.codigo}" min="1" placeholder="0" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
                             </div>
-                        </div>
-
-                        <div class="space-y-1">
-                            <div class="text-[11px] font-semibold text-slate-300"><i class="fa-solid fa-store mr-1"></i> Detalhes por Loja</div>
-                            <div class="max-h-44 overflow-y-auto border border-slate-800 rounded-xl bg-slate-950">
-                                <table class="w-full text-xs text-left">
-                                    <thead class="text-slate-400 border-b border-slate-800 bg-slate-900/50 sticky top-0">
-                                        <tr>
-                                            <th class="p-1.5 text-[10px]">Loja/Filial</th>
-                                            <th class="p-1.5 text-[10px] text-right">Preço Venda</th>
-                                            <th class="p-1.5 text-[10px] text-center">Estq. Loja</th>
-                                            <th class="p-1.5 text-[10px] text-center">Qtd Vendida</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${detalhesLojaHtml || '<tr><td colspan="4" class="p-3 text-center text-slate-500">Nenhum dado encontrado</td></tr>'}
-                                    </tbody>
-                                </table>
+                            <div>
+                                <label class="text-[10px] text-slate-400 block mb-1">Preço Custo (R$)</label>
+                                <input type="number" step="0.01" id="custo-entrada-${info.codigo}" placeholder="0.00" value="${info.custo || ''}" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
                             </div>
                         </div>
                         
-                        <div class="pt-2 border-t border-slate-800/80 space-y-2">
-                            <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider block"><i class="fa-solid fa-cart-plus mr-1"></i> Compras / Nota de Entrada</span>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="text-[10px] text-slate-400 block mb-1">Qtd Comprada</label>
-                                    <input type="number" id="qtd-entrada-${info.codigo}" min="1" placeholder="0" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] text-slate-400 block mb-1">Preço Custo (R$)</label>
-                                    <input type="number" step="0.01" id="custo-entrada-${info.codigo}" placeholder="0.00" value="${info.custo || ''}" oninput="calcularTotalLinha('${info.codigo}')" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
-                                </div>
-                            </div>
-                            
-                            <div class="flex justify-between items-center bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 text-xs">
-                                <span class="text-slate-400">Total desta linha:</span>
-                                <span id="total-linha-${info.codigo}" class="font-mono font-bold text-amber-400">R$ 0,00</span>
-                            </div>
-
-                            <button onclick="adicionarAoPedido('${info.codigo}', '${info.descricao.replace(/'/g, "\\'")}', '${info.categoria}')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-xl text-xs transition">
-                                Adicionar ao Pedido
-                            </button>
+                        <div class="flex justify-between items-center bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 text-xs">
+                            <span class="text-slate-400">Total desta linha:</span>
+                            <span id="total-linha-${info.codigo}" class="font-mono font-bold text-amber-400">R$ 0,00</span>
                         </div>
-                    `;
-                    resultsContainer.appendChild(card);
-                });
 
-            } catch (err) {
-                statusAlert.innerText = "Erro ao consultar: " + err.message;
-                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-950 text-rose-300 border border-rose-800";
-            }
+                        <button onclick="adicionarAoPedido('${info.codigo}', '${info.descricao.replace(/'/g, "\\'")}', '${info.categoria}')" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2 rounded-xl text-xs transition">
+                            Adicionar ao Pedido
+                        </button>
+                    </div>
+                `;
+                resultsContainer.appendChild(card);
+            });
         }
 
         function calcularTotalLinha(codigoEan) {
@@ -584,6 +671,22 @@
             const custo = parseFloat(document.getElementById(`custo-entrada-${codigoEan}`).value) || 0;
             const subtotal = qtd * custo;
             document.getElementById(`total-linha-${codigoEan}`).innerText = subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function adicionarNovoProdutoAoPedido(codigo, descricao, categoria, qtd, custo) {
+            const subtotal = qtd * custo;
+            const indexExistente = itensPedido.findIndex(i => i.codigo === codigo);
+
+            if (indexExistente >= 0) {
+                itensPedido[indexExistente].qtd += qtd;
+                itensPedido[indexExistente].custo = custo;
+                itensPedido[indexExistente].subtotal = itensPedido[indexExistente].qtd * custo;
+            } else {
+                itensPedido.push({ codigo, descricao, categoria, qtd, custo, subtotal });
+            }
+
+            salvarEstadoPedidoAtual();
+            atualizarInterfacePedido();
         }
 
         function adicionarAoPedido(codigo, descricao, categoria) {
@@ -602,21 +705,10 @@
                 return;
             }
 
-            const subtotal = qtd * custo;
-            const indexExistente = itensPedido.findIndex(i => i.codigo === codigo);
-
-            if (indexExistente >= 0) {
-                itensPedido[indexExistente].qtd += qtd;
-                itensPedido[indexExistente].custo = custo;
-                itensPedido[indexExistente].subtotal = itensPedido[indexExistente].qtd * custo;
-            } else {
-                itensPedido.push({ codigo, descricao, categoria, qtd, custo, subtotal });
-            }
+            adicionarNovoProdutoAoPedido(codigo, descricao, categoria, qtd, custo);
 
             inputQtd.value = '';
             document.getElementById(`total-linha-${codigo}`).innerText = "R$ 0,00";
-            salvarEstadoPedidoAtual();
-            atualizarInterfacePedido();
         }
 
         function removerDoPedido(codigo) {
@@ -707,6 +799,15 @@
             const qtd = Number(document.getElementById('cad-qtd').value);
             const custo = parseFloat(document.getElementById('cad-custo').value);
 
+            if (!qtd || qtd <= 0) {
+                alert("Informe uma quantidade válida.");
+                return;
+            }
+            if (isNaN(custo) || custo < 0) {
+                alert("Informe um preço de custo válido.");
+                return;
+            }
+
             try {
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
                 if (error) throw error;
@@ -731,9 +832,17 @@
 
                 if (saveError) throw saveError;
 
+                // Atualiza a memória local para refletir o novo produto imediatamente
+                if (regEstoque) {
+                    regEstoque.data = estoqueData;
+                }
+
                 modalCadastro.classList.add('hidden');
-                adicionarAoPedido(ean, produto, categoria, qtd, custo);
-                alert("Produto cadastrado e adicionado à lista de compras!");
+                
+                // Adiciona o produto cadastrado ao pedido de compras
+                adicionarNovoProdutoAoPedido(ean, produto, categoria, qtd, custo);
+                
+                alert("Produto cadastrado e adicionado ao pedido com sucesso!");
                 buscar(ean);
 
             } catch (err) {
