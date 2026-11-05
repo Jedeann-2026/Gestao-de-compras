@@ -221,12 +221,11 @@
         const SUPABASE_KEY = "sb_publishable_taL59MpBnTvHmpfD8eMSnw_f2QuR6w-";
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // SENHAS DOS USUÁRIOS (Pode alterar conforme preferir)
         const SENHAS_USUARIOS = {
             "Jedeann": "1234",
             "Cristiane": "1234",
             "Admin": "admin123",
-            "Convidado": "" // Sem senha necessária para convidado
+            "Convidado": ""
         };
 
         let html5QrCode = null, isScanning = false;
@@ -253,7 +252,6 @@
         const btnFecharModal = document.getElementById('btn-fechar-modal');
         const formCadastrarProduto = document.getElementById('form-cadastrar-produto');
 
-        // FUNÇÃO DE LOGIN E CONTROLE DE SESSÃO
         function fazerLogin(e) {
             e.preventDefault();
             const usuario = document.getElementById('login-usuario').value;
@@ -299,21 +297,18 @@
             }
         }
 
-        // CONFIGURAÇÃO DOS ÚLTIMOS 7 DIAS (EXCLUINDO O DIA DE HOJE)
         function inicializarFiltroDatas() {
             const hoje = new Date();
-            
             const dataFim = new Date(hoje);
-            dataFim.setDate(hoje.getDate() - 1); // Ontem
+            dataFim.setDate(hoje.getDate() - 1);
             
             const dataInicio = new Date(dataFim);
-            dataInicio.setDate(dataFim.getDate() - 6); // 7 dias atrás
+            dataInicio.setDate(dataFim.getDate() - 6);
 
             filtroInicio.value = dataInicio.toISOString().split('T')[0];
             filtroFim.value = dataFim.toISOString().split('T')[0];
         }
 
-        // CONTROLE DE TEMA (CLARO / ESCURO)
         function inicializarTema() {
             const temaSalvo = localStorage.getItem('nexxa_tema');
             if (temaSalvo === 'dark' || (!temaSalvo && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -359,7 +354,6 @@
             inicializarTema();
             inicializarFiltroDatas();
 
-            // Verifica se já está logado
             if (!usuarioLogado) {
                 modalLogin.classList.remove('hidden');
             } else {
@@ -736,33 +730,43 @@
                     regVendas.data.forEach(v => {
                         let vEan = v.ean ? String(v.ean).trim() : '';
                         if (vEan === info.codigo) {
-                            let dataVendaStr = v.data || v.dataVenda || v.created_at || '';
-                            if (dataInicioVal || dataFimVal) {
-                                if (!dataVendaStr) return;
-                                let dataVendaObj = new Date(dataVendaStr);
-                                if (isNaN(dataVendaObj)) return;
-                                if (dataInicioVal && dataVendaObj < dataInicioVal) return;
-                                if (dataFimVal && dataVendaObj > dataFimVal) return;
-                            }
-
                             let cliente = (v.cliente || v.loja || 'Geral').trim();
                             let preco = parseFloat(v.vlrUnit || 0);
                             let qtdV = Number(v.qtd || v.quantidade || 1);
-                            let totalLinha = qtdV * preco;
-
-                            totalVendidoGeral += totalLinha;
-                            qtdVendidaGeral += qtdV;
 
                             if (!clientMap[cliente]) {
-                                clientMap[cliente] = { estoque: 0, preco: preco };
-                            } else {
-                                if (preco > 0) clientMap[cliente].preco = preco;
+                                clientMap[cliente] = { estoque: 0, preco: 0 };
+                            }
+                            if (preco > 0) {
+                                clientMap[cliente].preco = preco;
                             }
 
-                            if (!vendasPorLojaMap[cliente]) {
-                                vendasPorLojaMap[cliente] = { qtdVenda: 0 };
+                            let dataVendaStr = v.data || v.dataVenda || v.created_at || '';
+                            let dentroDoPeriodo = true;
+                            if (dataInicioVal || dataFimVal) {
+                                if (!dataVendaStr) {
+                                    dentroDoPeriodo = false;
+                                } else {
+                                    let dataVendaObj = new Date(dataVendaStr);
+                                    if (isNaN(dataVendaObj)) {
+                                        dentroDoPeriodo = false;
+                                    } else {
+                                        if (dataInicioVal && dataVendaObj < dataInicioVal) dentroDoPeriodo = false;
+                                        if (dataFimVal && dataVendaObj > dataFimVal) dentroDoPeriodo = false;
+                                    }
+                                }
                             }
-                            vendasPorLojaMap[cliente].qtdVenda += qtdV;
+
+                            if (dentroDoPeriodo) {
+                                let totalLinha = qtdV * preco;
+                                totalVendidoGeral += totalLinha;
+                                qtdVendidaGeral += qtdV;
+
+                                if (!vendasPorLojaMap[cliente]) {
+                                    vendasPorLojaMap[cliente] = { qtdVenda: 0 };
+                                }
+                                vendasPorLojaMap[cliente].qtdVenda += qtdV;
+                            }
                         }
                     });
                 }
@@ -793,13 +797,13 @@
                 Array.from(todasLojasSet).sort().forEach(loja => {
                     let dadosLoja = clientMap[loja] || { estoque: 0, preco: 0 };
                     let estLoja = dadosLoja.estoque || 0;
-                    let prcLoja = dadosLoja.preco > 0 ? dadosLoja.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ 0,00';
+                    let prcLoja = dadosLoja.preco > 0 ? dadosLoja.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem registro';
                     let vendaLoja = vendasPorLojaMap[loja] ? vendasPorLojaMap[loja].qtdVenda : 0;
 
                     detalhesLojaHtml += `
                         <tr class="border-b border-slate-200 dark:border-slate-900 text-[11px]">
                             <td class="p-1.5 font-medium text-slate-800 dark:text-slate-200">${loja}</td>
-                            <td class="p-1.5 text-right text-emerald-600 dark:text-emerald-400">${prcLoja}</td>
+                            <td class="p-1.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">${prcLoja}</td>
                             <td class="p-1.5 text-center text-amber-600 dark:text-amber-400 font-semibold">${estLoja}</td>
                             <td class="p-1.5 text-center text-slate-900 dark:text-white font-bold">${vendaLoja} un</td>
                         </tr>`;
@@ -1073,7 +1077,6 @@
             }
 
             try {
-                // 1. Atualizar o Estoque Global na Base
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
                 if (error) throw error;
 
@@ -1116,7 +1119,6 @@
 
                 if (updateError) throw updateError;
 
-                // 2. Garantir que as entradas sejam tratadas como Objeto (Dicionário)
                 let regEntradas = cloudData.find(d => d.id === 'entradas');
                 let entradasData = {};
                 
@@ -1136,7 +1138,6 @@
                     totalGeral: itensPedido.reduce((acc, i) => acc + i.subtotal, 0)
                 };
 
-                // 3. Gravação segura via UPSERT no ID 'entradas'
                 const { error: upsertError } = await supabaseClient
                     .from('nexxa_store')
                     .upsert({ id: 'entradas', data: entradasData });
