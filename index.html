@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AB Conveniencia - Compras - Mobile</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tailwindcss-cdn@3.4.10/tailwindcss.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -656,6 +656,7 @@
             categoriasEncontradas.clear();
             const termoUpper = termo.toUpperCase();
 
+            // 1. PRIMEIRO: Mapeia TODOS os registros de estoque que correspondem ao termo buscado
             if (regEstoque && regEstoque.data) {
                 for (let k in regEstoque.data) {
                     let item = regEstoque.data[k];
@@ -667,11 +668,19 @@
 
                     if (ean.includes(termo) || nome.includes(termoUpper)) {
                         let key = ean;
-                        if (!produtosMap[key]) produtosMap[key] = { codigo: ean, descricao: item.produto, categoria: item.categoria || 'GERAL', custo: item.custo || 0 };
+                        if (!produtosMap[key]) {
+                            produtosMap[key] = { 
+                                codigo: ean, 
+                                descricao: item.produto, 
+                                categoria: item.categoria || 'GERAL', 
+                                custo: item.custo || 0 
+                            };
+                        }
                     }
                 }
             }
 
+            // 2. SEGUNDO: Inclui também produtos que possam existir apenas em vendas (garantindo robustez caso não estejam no estoque)
             if (regVendas && regVendas.data) {
                 regVendas.data.forEach(v => {
                     let ean = v.ean ? String(v.ean).trim() : '';
@@ -682,7 +691,14 @@
 
                     if (ean.includes(termo) || nome.includes(termoUpper)) {
                         let key = ean;
-                        if (!produtosMap[key]) produtosMap[key] = { codigo: ean, descricao: v.produto, categoria: v.categoria || 'GERAL', custo: 0 };
+                        if (!produtosMap[key]) {
+                            produtosMap[key] = { 
+                                codigo: ean, 
+                                descricao: v.produto, 
+                                categoria: v.categoria || 'GERAL', 
+                                custo: 0 
+                            };
+                        }
                     }
                 });
             }
@@ -794,20 +810,33 @@
                 let todasLojasSet = new Set([...Object.keys(clientMap), ...Object.keys(vendasPorLojaMap)]);
 
                 let detalhesLojaHtml = "";
-                Array.from(todasLojasSet).sort().forEach(loja => {
-                    let dadosLoja = clientMap[loja] || { estoque: 0, preco: 0 };
-                    let estLoja = dadosLoja.estoque || 0;
-                    let prcLoja = dadosLoja.preco > 0 ? dadosLoja.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem registro';
-                    let vendaLoja = vendasPorLojaMap[loja] ? vendasPorLojaMap[loja].qtdVenda : 0;
-
-                    detalhesLojaHtml += `
+                
+                // CORREÇÃO: Garante que mesmo se não houver vendas ou registros específicos por loja, 
+                // os estoques cadastrados (ou linhas vazias informativas) apareçam corretamente.
+                if (todasLojasSet.size === 0) {
+                    detalhesLojaHtml = `
                         <tr class="border-b border-slate-200 dark:border-slate-900 text-[11px]">
-                            <td class="p-1.5 font-medium text-slate-800 dark:text-slate-200">${loja}</td>
-                            <td class="p-1.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">${prcLoja}</td>
-                            <td class="p-1.5 text-center text-amber-600 dark:text-amber-400 font-semibold">${estLoja}</td>
-                            <td class="p-1.5 text-center text-slate-900 dark:text-white font-bold">${vendaLoja} un</td>
+                            <td class="p-1.5 font-medium text-slate-800 dark:text-slate-200">Geral / Estoque Direto</td>
+                            <td class="p-1.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">Sem registro</td>
+                            <td class="p-1.5 text-center text-amber-600 dark:text-amber-400 font-semibold">${estoqueGeralTotal}</td>
+                            <td class="p-1.5 text-center text-slate-900 dark:text-white font-bold">0 un</td>
                         </tr>`;
-                });
+                } else {
+                    Array.from(todasLojasSet).sort().forEach(loja => {
+                        let dadosLoja = clientMap[loja] || { estoque: 0, preco: 0 };
+                        let estLoja = dadosLoja.estoque || 0;
+                        let prcLoja = dadosLoja.preco > 0 ? dadosLoja.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem registro';
+                        let vendaLoja = vendasPorLojaMap[loja] ? vendasPorLojaMap[loja].qtdVenda : 0;
+
+                        detalhesLojaHtml += `
+                            <tr class="border-b border-slate-200 dark:border-slate-900 text-[11px]">
+                                <td class="p-1.5 font-medium text-slate-800 dark:text-slate-200">${loja}</td>
+                                <td class="p-1.5 text-right font-semibold text-emerald-600 dark:text-emerald-400">${prcLoja}</td>
+                                <td class="p-1.5 text-center text-amber-600 dark:text-amber-400 font-semibold">${estLoja}</td>
+                                <td class="p-1.5 text-center text-slate-900 dark:text-white font-bold">${vendaLoja} un</td>
+                            </tr>`;
+                    });
+                }
 
                 let card = document.createElement('div');
                 card.className = "bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xl transition-colors";
@@ -843,7 +872,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${detalhesLojaHtml || '<tr><td colspan="4" class="p-3 text-center text-slate-400 dark:text-slate-500">Nenhum dado encontrado</td></tr>'}
+                                    ${detalhesLojaHtml}
                                 </tbody>
                             </table>
                         </div>
@@ -1077,8 +1106,32 @@
             }
 
             try {
+                // 1. Busca os dados mais recentes da nuvem para validar o número do pedido e atualizar o estoque
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
                 if (error) throw error;
+
+                let regEntradas = cloudData.find(d => d.id === 'entradas');
+                let entradasData = {};
+                
+                if (regEntradas && regEntradas.data && !Array.isArray(regEntradas.data)) {
+                    entradasData = regEntradas.data;
+                }
+
+                // CORREÇÃO: Verifica se o número de pedido atual já existe nas nuvens.
+                // Se já existir, incrementa até achar um número livre (seguindo a regra solicitada).
+                let numPedidoValidado = numeroPedidoAtual;
+                let numAtualStr = String(numPedidoValidado).padStart(4, '0');
+                
+                let pedidoJaExiste = Object.values(entradasData).some(nota => nota.numeroPedido === numAtualStr);
+                
+                while (pedidoJaExiste) {
+                    numPedidoValidado++;
+                    numAtualStr = String(numPedidoValidado).padStart(4, '0');
+                    pedidoJaExiste = Object.values(entradasData).some(nota => nota.numeroPedido === numAtualStr);
+                }
+
+                // Atualiza o estado global com o número seguro validado nas nuvens
+                numeroPedidoAtual = numPedidoValidado;
 
                 let regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
                 if (!regEstoque) throw new Error("Registro de estoque não encontrado.");
@@ -1119,14 +1172,6 @@
 
                 if (updateError) throw updateError;
 
-                let regEntradas = cloudData.find(d => d.id === 'entradas');
-                let entradasData = {};
-                
-                if (regEntradas && regEntradas.data && !Array.isArray(regEntradas.data)) {
-                    entradasData = regEntradas.data;
-                }
-
-                const numAtualStr = String(numeroPedidoAtual).padStart(4, '0');
                 const notaKey = "NOTA_" + Date.now();
 
                 entradasData[notaKey] = {
