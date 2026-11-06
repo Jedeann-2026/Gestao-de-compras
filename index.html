@@ -477,26 +477,47 @@
         }
 
         function obterUltimoPrecoCompra(eanAlvo) {
-            if (!regEntradasBase || !regEntradasBase.data) return 0;
+            if (!regEntradasBase) return 0;
 
-            let notas = regEntradasBase.data;
+            let listaEntradas = [];
+            if (Array.isArray(regEntradasBase)) {
+                listaEntradas = regEntradasBase;
+            } else if (regEntradasBase.data) {
+                if (Array.isArray(regEntradasBase.data)) {
+                    listaEntradas = regEntradasBase.data;
+                } else if (typeof regEntradasBase.data === 'object') {
+                    listaEntradas = Object.values(regEntradasBase.data);
+                }
+            }
+
             let ultimaData = 0;
             let ultimoPreco = 0;
 
-            for (let k in notas) {
-                let nota = notas[k];
-                if (nota && nota.itens && Array.isArray(nota.itens)) {
-                    nota.itens.forEach(item => {
-                        if (String(item.codigo).trim() === String(eanAlvo).trim()) {
-                            let dataNota = nota.dataFinalizacao ? new Date(nota.dataFinalizacao).getTime() : 0;
-                            if (dataNota >= ultimaData) {
-                                ultimaData = dataNota;
-                                ultimoPreco = Number(item.custo) || 0;
+            listaEntradas.forEach(nota => {
+                let itensNota = [];
+                if (nota.itens && Array.isArray(nota.itens)) {
+                    itensNota = nota.itens;
+                } else if (nota.ean && (nota.precoUnit || nota.custo)) {
+                    itensNota = [nota];
+                }
+
+                itensNota.forEach(item => {
+                    let itemEan = String(item.ean || item.codigo || item.eanProduto || '').trim();
+                    if (itemEan === String(eanAlvo).trim()) {
+                        let dataNotaStr = nota.data || nota.dataFinalizacao || item.data || '';
+                        let dataNota = dataNotaStr ? new Date(dataNotaStr).getTime() : 0;
+                        
+                        if (dataNota >= ultimaData) {
+                            ultimaData = dataNota;
+                            let preco = Number(item.precoUnit || item.custo || item.vlrUnit || item.precoCusto || 0);
+                            if (preco > 0) {
+                                ultimoPreco = preco;
                             }
                         }
-                    });
-                }
-            }
+                    }
+                });
+            });
+
             return ultimoPreco;
         }
 
@@ -656,7 +677,6 @@
             categoriasEncontradas.clear();
             const termoUpper = termo.toUpperCase();
 
-            // 1. PRIMEIRO: Mapeia TODOS os registros de estoque que correspondem ao termo buscado
             if (regEstoque && regEstoque.data) {
                 for (let k in regEstoque.data) {
                     let item = regEstoque.data[k];
@@ -680,7 +700,6 @@
                 }
             }
 
-            // 2. SEGUNDO: Inclui também produtos que possam existir apenas em vendas (garantindo robustez caso não estejam no estoque)
             if (regVendas && regVendas.data) {
                 regVendas.data.forEach(v => {
                     let ean = v.ean ? String(v.ean).trim() : '';
@@ -811,8 +830,6 @@
 
                 let detalhesLojaHtml = "";
                 
-                // CORREÇÃO: Garante que mesmo se não houver vendas ou registros específicos por loja, 
-                // os estoques cadastrados (ou linhas vazias informativas) apareçam corretamente.
                 if (todasLojasSet.size === 0) {
                     detalhesLojaHtml = `
                         <tr class="border-b border-slate-200 dark:border-slate-900 text-[11px]">
@@ -838,11 +855,26 @@
                     });
                 }
 
+                // URL da imagem no Supabase Storage e Fallback
+                const urlImagem = `https://mjkqkyuolsqhtxwzivof.supabase.co/storage/v1/object/public/produtos-imagens/${info.codigo}.jpg`;
+                const imgFallback = "https://via.placeholder.com/80?text=Sem+Foto";
+
                 let card = document.createElement('div');
                 card.className = "bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xl transition-colors";
                 card.innerHTML = `
-                    <h2 class="font-bold text-slate-900 dark:text-white text-sm">${info.descricao}</h2>
-                    <div class="text-[10px] text-amber-600 dark:text-amber-400">EAN: ${info.codigo} | Cat: ${info.categoria}</div>
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <img src="${urlImagem}" 
+                             onerror="this.onerror=null; this.src='${imgFallback}';" 
+                             alt="${info.descricao}" 
+                             class="w-14 h-14 object-cover rounded-xl border border-slate-200 dark:border-slate-800 shrink-0 bg-slate-100 dark:bg-slate-950">
+                        
+                        <div class="space-y-1 min-w-0 flex-1">
+                            <span class="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">${info.categoria}</span>
+                            <h2 class="font-bold text-slate-900 dark:text-white text-sm leading-snug truncate">${info.descricao}</h2>
+                            <div class="text-[10px] text-amber-600 dark:text-amber-400 font-mono">EAN: ${info.codigo}</div>
+                        </div>
+                    </div>
+
                     <div class="text-[11px] bg-slate-50 dark:bg-slate-950 p-2 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-around text-slate-600 dark:text-slate-300 font-mono">
                         <span>Estq. Loja: <strong class="text-slate-900 dark:text-white">${lojaTotalSum}</strong></span>
                         <span>Estq. CD: <strong class="text-blue-600 dark:text-blue-400">${cdTotal}</strong></span>
@@ -1106,7 +1138,6 @@
             }
 
             try {
-                // 1. Busca os dados mais recentes da nuvem para validar o número do pedido e atualizar o estoque
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
                 if (error) throw error;
 
@@ -1117,8 +1148,6 @@
                     entradasData = regEntradas.data;
                 }
 
-                // CORREÇÃO: Verifica se o número de pedido atual já existe nas nuvens.
-                // Se já existir, incrementa até achar um número livre (seguindo a regra solicitada).
                 let numPedidoValidado = numeroPedidoAtual;
                 let numAtualStr = String(numPedidoValidado).padStart(4, '0');
                 
@@ -1130,7 +1159,6 @@
                     pedidoJaExiste = Object.values(entradasData).some(nota => nota.numeroPedido === numAtualStr);
                 }
 
-                // Atualiza o estado global com o número seguro validado nas nuvens
                 numeroPedidoAtual = numPedidoValidado;
 
                 let regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
