@@ -128,9 +128,7 @@
             </div>
         </div>
 
-        <!-- RESULTADOS DA BUSCA -->
-        <div id="results-container" class="space-y-4"></div>
-
+     
         <!-- LISTA DE ITENS DO PEDIDO EM ANDAMENTO -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xl transition-colors">
             <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
@@ -175,6 +173,9 @@
                     <i class="fa-solid fa-lock mr-1"></i> Perfil Convidado (Modo Leitura / Sem Gravação)
                 </div>
             </div>
+               <!-- RESULTADOS DA BUSCA -->
+        <div id="results-container" class="space-y-4"></div>
+
         </div>
     </div>
 
@@ -585,6 +586,52 @@
             }
         });
 
+
+let ultimoCodigoLido = null;
+let debounceTimeout = null;
+async function iniciarCameraTotal() {
+    const readerElement = document.getElementById('reader');
+    readerElement.innerHTML = ''; 
+    html5QrCode = new Html5Qrcode("reader");
+    const config = { 
+        fps: 15, 
+        qrbox: { width: 300, height: 100 },
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8
+        ]
+    };
+    try {
+        await html5QrCode.start(
+            { facingMode: "environment" }, 
+            config, 
+            (text) => {
+                if (text === ultimoCodigoLido) return; // evita leituras duplicadas
+                ultimoCodigoLido = text;
+                if (debounceTimeout) clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(async () => {
+                    await pararCameraTotal();
+                    inputSearch.value = text.trim();
+                    buscar(text.trim());
+                }, 300); // debounce 300ms
+            }, 
+            () => {}
+        );
+        isScanning = true; 
+        btnScan.innerText = "Parar Câmera"; 
+        btnScan.classList.replace('bg-amber-500', 'bg-rose-600');
+        btnScan.classList.replace('text-slate-950', 'text-white');
+    } catch (err) {
+        console.error("Erro ao iniciar câmara:", err);
+        statusAlert.innerText = "Erro na câmara. Verifique as permissões.";
+        statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
+        statusAlert.classList.remove('hidden');
+        isScanning = false;
+        btnScan.innerText = "Escanear Código";
+    }
+}
+/*
+
         async function iniciarCameraTotal() {
             const readerElement = document.getElementById('reader');
             readerElement.innerHTML = ''; 
@@ -630,8 +677,8 @@
                 btnScan.innerText = "Escanear Código";
             }
         }
-
-        async function pararCameraTotal() {
+*/
+  /*      async function pararCameraTotal() {
             if (html5QrCode) {
                 try {
                     if (html5QrCode.isScanning) {
@@ -663,6 +710,43 @@
         btnFecharModal.addEventListener('click', () => {
             modalCadastro.classList.add('hidden');
         });
+*/
+
+async function pararCameraTotal() {
+    if (html5QrCode) {
+        try {
+            if (html5QrCode.isScanning) {
+                await html5QrCode.stop();
+            }
+            await html5QrCode.clear();
+        } catch (e) {
+            console.error("Erro ao limpar câmara:", e);
+        }
+        html5QrCode = null;
+    }
+    isScanning = false;
+    btnScan.innerText = "Escanear Código";
+    btnScan.classList.replace('bg-rose-600', 'bg-amber-500');
+    btnScan.classList.replace('text-white', 'text-slate-950');
+    
+    const readerElement = document.getElementById('reader');
+    if (readerElement && !readerElement.querySelector('video')) {
+        readerElement.innerHTML = `<span class="text-xs text-slate-500">Câmera desativada</span>`;
+    }
+}
+        formManual.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const termo = inputSearch.value.trim();
+            if (termo) buscar(termo);
+        });
+
+        btnFecharModal.addEventListener('click', () => {
+            modalCadastro.classList.add('hidden');
+        });
+
+
+
+
 
         function buscar(termo, exibirAlerta = true) {
             ultimoTermoPesquisado = termo;
