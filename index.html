@@ -1051,7 +1051,7 @@
             }
         }
 
-        function atualizarInterfacePedido() {
+function atualizarInterfacePedido() {
             const container = document.getElementById('lista-pedido');
             const totalElement = document.getElementById('total-geral-pedido');
 
@@ -1061,9 +1061,52 @@
                 return;
             }
 
+            // 1. Agrupa os itens por produto (código EAN/código único) para calcular Qtd Geral e Valor Geral por Produto
+            const resumoPorProdutoMap = {};
+            itensPedido.forEach(item => {
+                const key = item.codigo;
+                if (!resumoPorProdutoMap[key]) {
+                    resumoPorProdutoMap[key] = {
+                        codigo: item.codigo,
+                        descricao: item.descricao,
+                        categoria: item.categoria,
+                        qtdGeral: 0,
+                        valorGeral: 0
+                    };
+                }
+                resumoPorProdutoMap[key].qtdGeral += item.qtd;
+                resumoPorProdutoMap[key].valorGeral += item.subtotal;
+            });
+
             container.innerHTML = "";
             let totalGeral = 0;
 
+            // 2. Renderiza o resumo consolidado por produto na parte superior da lista
+            const divResumoConsolidado = document.createElement('div');
+            divResumoConsolidado.className = "mb-3 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1.5";
+            
+            let htmlResumo = `<div class="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1 mb-1">
+                                <i class="fa-solid fa-boxes-stacked"></i> Resumo por Produto (Qtd & Valor Geral)
+                             </div>`;
+
+            Object.values(resumoPorProdutoMap).forEach(prod => {
+                htmlResumo += `
+                    <div class="flex justify-between items-center text-xs border-b border-amber-500/10 pb-1 last:border-b-0 last:pb-0">
+                        <div class="truncate max-w-[200px] text-slate-800 dark:text-slate-200 font-medium">
+                            ${prod.descricao}
+                        </div>
+                        <div class="flex items-center gap-2 font-mono text-[11px]">
+                            <span class="bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-bold">${prod.qtdGeral} un</span>
+                            <span class="font-bold text-emerald-600 dark:text-emerald-400">${prod.valorGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            divResumoConsolidado.innerHTML = htmlResumo;
+            container.appendChild(divResumoConsolidado);
+
+            // 3. Renderiza os itens detalhados (com loja de destino individual)
             itensPedido.forEach(item => {
                 totalGeral += item.subtotal;
                 let div = document.createElement('div');
@@ -1087,7 +1130,6 @@
 
             totalElement.innerText = totalGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         }
-
         function abrirModalCadastro(termo) {
             const isEan = /^\d+$/.test(termo);
             document.getElementById('cad-ean').value = isEan ? termo : '';
