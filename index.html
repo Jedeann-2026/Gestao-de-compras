@@ -57,10 +57,19 @@
 
     <!-- CONTEÚDO PRINCIPAL DO APLICATIVO -->
     <div id="app-container" class="max-w-md w-full mx-auto space-y-4">
+
         <!-- HEADER / SCANNER -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
+            <!-- LOGO NA PARTE DE CIMA -->
+            <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+                <img id="app-logo" src="https://mjkqkyuolsqhtxwzivof.supabase.co/storage/v1/object/public/produtos-imagens/logoab.jpeg" 
+                     onerror="this.style.display='none'" 
+                     alt="AB Conveniência Logo" 
+                     class="h-8 w-auto object-contain">
+                <span class="text-[10px] text-slate-400 dark:text-slate-500 font-mono">AB Conveniência</span>
+            </div>
+
             <div class="flex justify-between items-center mb-3">
-      
                 <div>
                     <h1 class="text-base font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2">
                         <i class="fa-solid fa-file-invoice-dollar"></i> Gestao de Compras
@@ -1310,7 +1319,7 @@
                         estoqueData[novoKey] = {
                             ean: itemPedido.codigo,
                             produto: itemPedido.descricao,
-                            categoria: itemPedido.categoria,
+                            categoria: itemNpedidos.categoria || itemPedido.categoria,
                             estoque: itemPedido.qtd,
                             custo: itemPedido.custo,
                             fornecedor: fornecedor,
