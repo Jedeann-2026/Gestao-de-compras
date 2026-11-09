@@ -60,7 +60,7 @@
 
         <!-- HEADER / SCANNER -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
-            <!-- LOGO NA PARTE DE CIMA -->
+            <!-- LOGO DO SUPABASE NO TOPO -->
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 dark:border-slate-800">
                 <img id="app-logo" src="https://mjkqkyuolsqhtxwzivof.supabase.co/storage/v1/object/public/produtos-imagens/logoab.jpeg" 
                      onerror="this.style.display='none'" 
@@ -91,7 +91,7 @@
             <div id="reader" class="w-full bg-slate-200 dark:bg-black rounded-xl overflow-hidden min-h-[200px] flex items-center justify-center mb-3 border border-slate-300 dark:border-slate-800">
                 <span class="text-xs text-slate-500 dark:text-slate-500">Câmera desativada</span>
             </div>
-            <button id="btn-scan" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition">
+            <button id="btn-scan" onclick="toggleCamera()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition">
                 Escanear Código
             </button>
         </div>
@@ -134,12 +134,8 @@
             </div>
         </div>
 
-     
         <!-- LISTA DE ITENS DO PEDIDO EM ANDAMENTO -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xl transition-colors">
-    
-      
-            <!-- CABEÇALHO REORGANIZADO CORRETAMENTE -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
                 <div class="flex items-center gap-2">
                     <h2 class="font-bold text-amber-600 dark:text-amber-400 text-sm flex items-center gap-1.5">
@@ -629,6 +625,15 @@
 
         let ultimoCodigoLido = null;
         let debounceTimeout = null;
+
+        function toggleCamera() {
+            if (isScanning) {
+                pararCameraTotal();
+            } else {
+                iniciarCameraTotal();
+            }
+        }
+
         async function iniciarCameraTotal() {
             const readerElement = document.getElementById('reader');
             readerElement.innerHTML = ''; 
@@ -1319,7 +1324,7 @@
                         estoqueData[novoKey] = {
                             ean: itemPedido.codigo,
                             produto: itemPedido.descricao,
-                            categoria: itemNpedidos.categoria || itemPedido.categoria,
+                            categoria: itemPedido.categoria,
                             estoque: itemPedido.qtd,
                             custo: itemPedido.custo,
                             fornecedor: fornecedor,
