@@ -12,9 +12,18 @@
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- LIB ZXING: EXCELENTE PARA CÂMERA AO VIVO NO SAFARI/IOS -->
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest"></script>
     <!-- LIB PARA EXPORTAÇÃO EXCEL NATIVA -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        #video-preview {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            border-radius: 0.75rem;
+        }
+    </style>
 </head>
 <body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans p-4 pb-48 transition-colors duration-200">
 
@@ -55,7 +64,7 @@
     <!-- CONTEÚDO PRINCIPAL DO APLICATIVO -->
     <div id="app-container" class="max-w-md w-full mx-auto space-y-4">
 
-        <!-- HEADER / SCANNER NATIVO ROBUSTO -->
+        <!-- HEADER / SCANNER AO VIVO DA CÂMERA -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
             <!-- LOGO DO SUPABASE NO TOPO -->
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -85,13 +94,21 @@
                 </div>
             </div>
             
-            <!-- CAPTURA NATIVA ESTÁVEL PARA IOS/ANDROID -->
-            <div class="space-y-2">
-                <input type="file" id="input-camera-nativa" accept="image/*" capture="environment" class="hidden" onchange="lerCodigoPorFotoNativa(this)">
-                <button onclick="document.getElementById('input-camera-nativa').click()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-4 rounded-2xl text-sm transition shadow-lg flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-camera text-base"></i> Abrir Câmera e Ler Código EAN
+            <!-- CONTAINER DO VÍDEO DA CÂMERA -->
+            <div id="video-wrapper" class="relative w-full bg-slate-900 rounded-xl overflow-hidden min-h-[220px] flex items-center justify-center mb-3 border border-slate-300 dark:border-slate-800">
+                <video id="video-preview" class="hidden"></video>
+                <div id="video-placeholder" class="text-center p-4">
+                    <i class="fa-solid fa-camera-retro text-slate-500 text-3xl mb-2 block"></i>
+                    <span class="text-xs text-slate-400 block">Câmera desativada</span>
+                </div>
+                <!-- LINHA GUIA DE LEITURA -->
+                <div id="scan-line" class="hidden absolute left-4 right-4 top-1/2 h-0.5 bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-pulse pointer-events-none"></div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2">
+                <button id="btn-scan" onclick="toggleCameraZXing()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md">
+                    <i class="fa-solid fa-barcode text-sm"></i> Ativar Câmera ao Vivo
                 </button>
-                <p class="text-[10px] text-slate-400 dark:text-slate-500 text-center">Abre a câmera do celular para leitura instantânea e sem travamentos.</p>
             </div>
         </div>
 
@@ -231,9 +248,6 @@
         </div>
     </div>
 
-    <!-- DIV OCULTA NECESSÁRIA PARA O PROCESSAMENTO DE IMAGEM -->
-    <div id="hidden-reader-container" class="hidden"></div>
-
     <script>
         const SUPABASE_URL = "https://mjkqkyuolsqhtxwzivof.supabase.co";
         const SUPABASE_KEY = "sb_publishable_taL59MpBnTvHmpfD8eMSnw_f2QuR6w-";
@@ -255,8 +269,14 @@
         let ultimoTermoPesquisado = '';
         let usuarioLogado = localStorage.getItem('nexxa_usuario_logado') || null;
 
+        // VARIÁVEIS DE CONTROLE DA CÂMERA (ZXING)
+        let codeReader = null;
+        let isCameraActive = false;
+        let selectedDeviceId = null;
+
         const modalLogin = document.getElementById('modal-login');
         const loginErro = document.getElementById('login-erro');
+        const btnScan = document.getElementById('btn-scan');
         const formManual = document.getElementById('form-manual');
         const inputSearch = document.getElementById('input-search');
         const filtroInicio = document.getElementById('filtro-inicio');
@@ -288,6 +308,7 @@
 
         function fazerLogout() {
             if (confirm("Deseja trocar de usuário / sair da sessão?")) {
+                pararCameraZXing();
                 localStorage.removeItem('nexxa_usuario_logado');
                 usuarioLogado = null;
                 document.getElementById('login-senha').value = '';
@@ -382,72 +403,92 @@
             atualizarListaPendentes();
         });
 
-        // LEITOR NATIVO ROBUSTO COM REDIMENSIONAMENTO VIA CANVAS (ELIMINA ERROS DE RESOLUÇÃO E ORIENTAÇÃO DO IOS)
-        async function lerCodigoPorFotoNativa(input) {
-            if (!input.files || input.files.length === 0) return;
-            const file = input.files[0];
+        // CONTROLADOR DE CÂMERA AO VIVO COM ZXING (ALTAMENTE COMPATÍVEL COM SAFARI/IOS)
+        function toggleCameraZXing() {
+            if (isCameraActive) {
+                pararCameraZXing();
+            } else {
+                iniciarCameraZXing();
+            }
+        }
 
-            statusAlert.innerText = "Processando imagem da câmera...";
+        async function iniciarCameraZXing() {
+            const videoElem = document.getElementById('video-preview');
+            const placeholderElem = document.getElementById('video-placeholder');
+            const scanLine = document.getElementById('scan-line');
+
+            statusAlert.innerText = "Solicitando acesso à câmera...";
             statusAlert.className = "p-2 rounded-xl text-xs text-center bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800";
             statusAlert.classList.remove('hidden');
 
             try {
-                // Redimensionar e normalizar imagem usando Canvas para garantir leitura perfeita pelo Html5Qrcode
-                const img = document.createElement('img');
-                const reader = new FileReader();
+                if (!codeReader) {
+                    codeReader = new ZXing.BrowserMultiFormatReader();
+                }
 
-                reader.onload = function(e) {
-                    img.src = e.target.result;
-                    img.onload = async function() {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 1000;
-                        const MAX_HEIGHT = 1000;
-                        let width = img.width;
-                        let height = img.height;
+                // Detecta as câmeras do aparelho e escolhe preferencialmente a traseira (environment)
+                const videoInputDevices = await codeReader.listVideoInputDevices();
+                
+                if (videoInputDevices.length === 0) {
+                    throw new Error("Nenhuma câmera encontrada no aparelho.");
+                }
 
-                        if (width > height) {
-                            if (width > MAX_WIDTH) {
-                                height *= MAX_WIDTH / width;
-                                width = MAX_WIDTH;
-                            }
-                        } else {
-                            if (height > MAX_HEIGHT) {
-                                width *= MAX_HEIGHT / height;
-                                height = MAX_HEIGHT;
-                            }
-                        }
+                // Tenta selecionar a câmera traseira
+                let backCamera = videoInputDevices.find(device => 
+                    device.label.toLowerCase().includes('back') || 
+                    device.label.toLowerCase().includes('traseira') ||
+                    device.label.toLowerCase().includes('environment')
+                );
+                
+                selectedDeviceId = backCamera ? backCamera.deviceId : videoInputDevices[videoInputDevices.length - 1].deviceId;
 
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
+                placeholderElem.classList.add('hidden');
+                videoElem.classList.remove('hidden');
+                scanLine.classList.remove('hidden');
 
-                        canvas.toBlob(async (blob) => {
-                            const resizedFile = new File([blob], "barcode.jpg", { type: "image/jpeg" });
-                            
-                            try {
-                                const html5QrCode = new Html5Qrcode("hidden-reader-container");
-                                const result = await html5QrCode.scanFile(resizedFile, true);
-                                inputSearch.value = result.trim();
-                                statusAlert.classList.add('hidden');
-                                buscar(result.trim());
-                            } catch (scanErr) {
-                                statusAlert.innerText = "Código de barras não identificado na foto. Tente aproximar mais ou digite abaixo.";
-                                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
-                                statusAlert.classList.remove('hidden');
-                            }
-                        }, 'image/jpeg', 0.9);
+                btnScan.innerHTML = `<i class="fa-solid fa-stop text-sm"></i> Parar Câmera`;
+                btnScan.className = "w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md";
+                isCameraActive = true;
+                statusAlert.classList.add('hidden');
+
+                // Inicia a decodificação contínua do vídeo ao vivo
+                codeReader.decodeFromVideoDevice(selectedDeviceId, 'video-preview', (result, err) => {
+                    if (result) {
+                        const eanLido = result.getText().trim();
+                        // Toca feedback tátil/vibração se suportado pelo iOS/Android
+                        if (navigator.vibrate) navigator.vibrate(100);
+
+                        inputSearch.value = eanLido;
+                        pararCameraZXing();
+                        buscar(eanLido);
                     }
-                };
-                reader.readAsDataURL(file);
+                });
 
             } catch (err) {
-                statusAlert.innerText = "Erro ao processar arquivo de imagem.";
+                console.error(err);
+                statusAlert.innerText = "Erro ao abrir câmera. Verifique se deu permissão no Safari/iOS.";
                 statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
                 statusAlert.classList.remove('hidden');
-            } finally {
-                input.value = ''; // Limpa o input para permitir ler a mesma foto de novo se necessário
+                pararCameraZXing();
             }
+        }
+
+        function pararCameraZXing() {
+            if (codeReader) {
+                codeReader.reset();
+            }
+            isCameraActive = false;
+
+            const videoElem = document.getElementById('video-preview');
+            const placeholderElem = document.getElementById('video-placeholder');
+            const scanLine = document.getElementById('scan-line');
+
+            if (videoElem) videoElem.classList.add('hidden');
+            if (placeholderElem) placeholderElem.classList.remove('hidden');
+            if (scanLine) scanLine.classList.add('hidden');
+
+            btnScan.innerHTML = `<i class="fa-solid fa-barcode text-sm"></i> Ativar Câmera ao Vivo`;
+            btnScan.className = "w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md";
         }
 
         function dispararBuscaRecorrente() {
