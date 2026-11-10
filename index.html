@@ -55,7 +55,7 @@
     <!-- CONTEÚDO PRINCIPAL DO APLICATIVO -->
     <div id="app-container" class="max-w-md w-full mx-auto space-y-4">
 
-        <!-- HEADER / SCANNER NATIVO ESTÁVEL -->
+        <!-- HEADER / SCANNER NATIVO ROBUSTO -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
             <!-- LOGO DO SUPABASE NO TOPO -->
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -85,13 +85,13 @@
                 </div>
             </div>
             
-            <!-- BOTÃO PRINCIPAL DE LEITURA (ABRE CÂMERA NATIVA DO CELULAR DIRETAMENTE) -->
+            <!-- CAPTURA NATIVA ESTÁVEL PARA IOS/ANDROID -->
             <div class="space-y-2">
-                <input type="file" id="input-camera-nativa" accept="image/*" capture="environment" class="hidden" onchange="iniciarCameraVideo(this)">
+                <input type="file" id="input-camera-nativa" accept="image/*" capture="environment" class="hidden" onchange="lerCodigoPorFotoNativa(this)">
                 <button onclick="document.getElementById('input-camera-nativa').click()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-4 rounded-2xl text-sm transition shadow-lg flex items-center justify-center gap-2">
                     <i class="fa-solid fa-camera text-base"></i> Abrir Câmera e Ler Código EAN
                 </button>
-                <p class="text-[10px] text-slate-400 dark:text-slate-500 text-center">Dispara a câmera nativa do seu celular para leitura instantânea.</p>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 text-center">Abre a câmera do celular para leitura instantânea e sem travamentos.</p>
             </div>
         </div>
 
@@ -230,6 +230,9 @@
             </form>
         </div>
     </div>
+
+    <!-- DIV OCULTA NECESSÁRIA PARA O PROCESSAMENTO DE IMAGEM -->
+    <div id="hidden-reader-container" class="hidden"></div>
 
     <script>
         const SUPABASE_URL = "https://mjkqkyuolsqhtxwzivof.supabase.co";
@@ -379,38 +382,73 @@
             atualizarListaPendentes();
         });
 
-        // LEITOR NATIVO ESTÁVEL POR CAPTURA DE FOTO
-async function iniciarCameraVideo() {
-    const readerElement = document.getElementById('reader');
-    readerElement.innerHTML = '';
-    html5QrCode = new Html5Qrcode("reader");
-    const config = {
-        fps: 20,
-        qrbox: { width: 400, height: 100 },
-        formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8]
-    };
-    let ultimoCodigo = null;
-    try {
-        await html5QrCode.start(
-            { facingMode: "environment" },
-            config,
-            qrCodeMessage => {
-                if (qrCodeMessage !== ultimoCodigo) {
-                    ultimoCodigo = qrCodeMessage;
-                    inputSearch.value = qrCodeMessage.trim();
-                    buscar(qrCodeMessage.trim());
-                    // Para a câmera após achar o código (ou pode manter para ler mais códigos)
-                    html5QrCode.stop();
-                }
-            },
-            errorMessage => {
-                // Pode ignorar erros de leitura contínua
-            });
-    } catch (err) {
-        console.error(err);
-        alert("Erro ao acessar a câmera.");
-    }
-}
+        // LEITOR NATIVO ROBUSTO COM REDIMENSIONAMENTO VIA CANVAS (ELIMINA ERROS DE RESOLUÇÃO E ORIENTAÇÃO DO IOS)
+        async function lerCodigoPorFotoNativa(input) {
+            if (!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+
+            statusAlert.innerText = "Processando imagem da câmera...";
+            statusAlert.className = "p-2 rounded-xl text-xs text-center bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800";
+            statusAlert.classList.remove('hidden');
+
+            try {
+                // Redimensionar e normalizar imagem usando Canvas para garantir leitura perfeita pelo Html5Qrcode
+                const img = document.createElement('img');
+                const reader = new FileReader();
+
+                reader.onload = function(e) {
+                    img.src = e.target.result;
+                    img.onload = async function() {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 1000;
+                        const MAX_HEIGHT = 1000;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob(async (blob) => {
+                            const resizedFile = new File([blob], "barcode.jpg", { type: "image/jpeg" });
+                            
+                            try {
+                                const html5QrCode = new Html5Qrcode("hidden-reader-container");
+                                const result = await html5QrCode.scanFile(resizedFile, true);
+                                inputSearch.value = result.trim();
+                                statusAlert.classList.add('hidden');
+                                buscar(result.trim());
+                            } catch (scanErr) {
+                                statusAlert.innerText = "Código de barras não identificado na foto. Tente aproximar mais ou digite abaixo.";
+                                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
+                                statusAlert.classList.remove('hidden');
+                            }
+                        }, 'image/jpeg', 0.9);
+                    }
+                };
+                reader.readAsDataURL(file);
+
+            } catch (err) {
+                statusAlert.innerText = "Erro ao processar arquivo de imagem.";
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
+                statusAlert.classList.remove('hidden');
+            } finally {
+                input.value = ''; // Limpa o input para permitir ler a mesma foto de novo se necessário
+            }
+        }
 
         function dispararBuscaRecorrente() {
             if (ultimoTermoPesquisado) {
