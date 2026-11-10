@@ -633,33 +633,46 @@
                 iniciarCameraTotal();
             }
         }
+
+
+
 async function iniciarCameraTotal() {
     const readerElement = document.getElementById('reader');
     readerElement.innerHTML = '';
     html5QrCode = new Html5Qrcode("reader");
-    const config = {
-        fps: 10,
-        qrbox: { width: 400, height: 150 },
+    const config = { 
+        fps: 20,
+        qrbox: { width: 400, height: 100 },
         formatsToSupport: [
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8
         ]
     };
+    const constraints = {
+        video: {
+            facingMode: "environment",
+            // fallback, pois muitos navegadores não suportam esses valores
+            focusMode: "continuous",
+            exposureMode: "continuous"
+        }
+    };
     let ultimoCodigoLido = null;
+    let debounceTimeout = null;
     try {
         await html5QrCode.start(
-            { facingMode: "environment" },
+            constraints,
             config,
             (text) => {
-                if (text && text !== ultimoCodigoLido) {
-                    ultimoCodigoLido = text;
+                if (text === ultimoCodigoLido) return;
+                ultimoCodigoLido = text;
+                if (debounceTimeout) clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(() => {
                     inputSearch.value = text.trim();
-                    // Processar busca fora do callback para não travar aqui
-                    setTimeout(() => buscar(text.trim()), 0);
-                }
+                    buscar(text.trim());
+                }, 150); // debounce 150ms
             },
             (error) => {
-                // Pode monitorar erros ou ignorar silenciosamente para não travar
+                // opcional: trate erros se quiser
             }
         );
         isScanning = true;
@@ -667,7 +680,7 @@ async function iniciarCameraTotal() {
         btnScan.classList.replace('bg-amber-500', 'bg-rose-600');
         btnScan.classList.replace('text-slate-950', 'text-white');
     } catch (err) {
-        console.error("Erro ao iniciar câmara:", err);
+        console.error("Erro ao iniciar câmera:", err);
         statusAlert.innerText = "Erro na câmera. Verifique as permissões.";
         statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
         statusAlert.classList.remove('hidden');
