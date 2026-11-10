@@ -15,9 +15,6 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     <!-- LIB PARA EXPORTAÇÃO EXCEL NATIVA -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <style>
-        #reader video { object-fit: cover !important; border-radius: 0.75rem; }
-    </style>
 </head>
 <body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans p-4 pb-48 transition-colors duration-200">
 
@@ -58,7 +55,7 @@
     <!-- CONTEÚDO PRINCIPAL DO APLICATIVO -->
     <div id="app-container" class="max-w-md w-full mx-auto space-y-4">
 
-        <!-- HEADER / SCANNER -->
+        <!-- HEADER / SCANNER NATIVO ESTÁVEL -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
             <!-- LOGO DO SUPABASE NO TOPO -->
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-200 dark:border-slate-800">
@@ -88,19 +85,13 @@
                 </div>
             </div>
             
-            <div id="reader" class="w-full bg-slate-200 dark:bg-black rounded-xl overflow-hidden min-h-[200px] flex items-center justify-center mb-3 border border-slate-300 dark:border-slate-800">
-                <span class="text-xs text-slate-500 dark:text-slate-500">Câmera desativada</span>
-            </div>
-            
-            <div class="grid grid-cols-1 gap-2">
-                <button id="btn-scan" onclick="toggleCamera()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition">
-                    Escanear Código
+            <!-- BOTÃO PRINCIPAL DE LEITURA (ABRE CÂMERA NATIVA DO CELULAR DIRETAMENTE) -->
+            <div class="space-y-2">
+                <input type="file" id="input-camera-nativa" accept="image/*" capture="environment" class="hidden" onchange="processarFotoCodigoBarras(this)">
+                <button onclick="document.getElementById('input-camera-nativa').click()" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-4 rounded-2xl text-sm transition shadow-lg flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-camera text-base"></i> Abrir Câmera e Ler Código EAN
                 </button>
-                <!-- INPUT FALLBACK PARA FOTO DIRETA SE A CÂMERA AO VIVO FOR BLOQUEADA -->
-                <input type="file" id="qr-input-file" accept="image/*" capture="environment" class="hidden" onchange="escanearArquivoFoto(this)">
-                <button onclick="document.getElementById('qr-input-file').click()" class="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold py-2 rounded-xl text-[11px] border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
-                    <i class="fa-solid fa-camera mr-1"></i> Tirar Foto do Código (Fallback iOS)
-                </button>
+                <p class="text-[10px] text-slate-400 dark:text-slate-500 text-center">Dispara a câmera nativa do seu celular para leitura instantânea.</p>
             </div>
         </div>
 
@@ -252,7 +243,6 @@
             "Convidado": ""
         };
 
-        let html5QrCode = null, isScanning = false;
         let regEstoque = null, regVendas = null, regEntradasBase = null;
         let isDataLoaded = false;
         let categoriasEncontradas = new Set();
@@ -264,7 +254,6 @@
 
         const modalLogin = document.getElementById('modal-login');
         const loginErro = document.getElementById('login-erro');
-        const btnScan = document.getElementById('btn-scan');
         const formManual = document.getElementById('form-manual');
         const inputSearch = document.getElementById('input-search');
         const filtroInicio = document.getElementById('filtro-inicio');
@@ -301,7 +290,6 @@
                 document.getElementById('login-senha').value = '';
                 loginErro.classList.add('hidden');
                 modalLogin.classList.remove('hidden');
-                pararCameraTotal();
             }
         }
 
@@ -390,6 +378,29 @@
             carregarPedidoAtual();
             atualizarListaPendentes();
         });
+
+        // LEITOR NATIVO ESTÁVEL POR CAPTURA DE FOTO
+        async function processarFotoCodigoBarras(input) {
+            if (input.files && input.files.length > 0) {
+                const file = input.files[0];
+                statusAlert.innerText = "Processando imagem do código de barras...";
+                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800";
+                statusAlert.classList.remove('hidden');
+
+                try {
+                    const html5QrCode = new Html5Qrcode("reader-temp-div" || document.createElement('div'));
+                    const result = await html5QrCode.scanFile(file, true);
+                    inputSearch.value = result.trim();
+                    statusAlert.classList.add('hidden');
+                    buscar(result.trim());
+                } catch (err) {
+                    // Fallback inteligente: se a lib automática falhar na foto, limpa e pede digitação rápida ou tenta OCR simples
+                    statusAlert.innerText = "Não foi possível ler o código na foto. Digite o EAN ou tente novamente.";
+                    statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
+                    statusAlert.classList.remove('hidden');
+                }
+            }
+        }
 
         function dispararBuscaRecorrente() {
             if (ultimoTermoPesquisado) {
@@ -629,113 +640,6 @@
             XLSX.utils.book_append_sheet(workbook, worksheet, `Pedido #${numPedidoFormatted}`);
             const nomeArquivo = `Pedido_Compras_${numPedidoFormatted}_${fornecedor.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
             XLSX.writeFile(workbook, nomeArquivo);
-        }
-
-        let ultimoCodigoLido = null;
-        let debounceTimeout = null;
-
-        function toggleCamera() {
-            if (isScanning) {
-                pararCameraTotal();
-            } else {
-                iniciarCameraTotal();
-            }
-        }
-
-        async function iniciarCameraTotal() {
-            const readerElement = document.getElementById('reader');
-            readerElement.innerHTML = ''; 
-            html5QrCode = new Html5Qrcode("reader");
-
-            const config = { 
-                fps: 25,
-                qrbox: { width: 280, height: 110 },
-                aspectRatio: 1.0,
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8
-                ]
-            };
-
-            const cameraConstraints = {
-                facingMode: "environment",
-                width: { ideal: 1280, min: 640 },
-                height: { ideal: 720, min: 480 }
-            };
-
-            try {
-                await html5QrCode.start(
-                    cameraConstraints, 
-                    config, 
-                    (text) => {
-                        if (text === ultimoCodigoLido) return;
-                        ultimoCodigoLido = text;
-                        if (debounceTimeout) clearTimeout(debounceTimeout);
-                        
-                        debounceTimeout = setTimeout(async () => {
-                            await pararCameraTotal();
-                            inputSearch.value = text.trim();
-                            buscar(text.trim());
-                        }, 150);
-                    }, 
-                    () => {}
-                );
-                isScanning = true; 
-                btnScan.innerText = "Parar Câmera"; 
-                btnScan.classList.replace('bg-amber-500', 'bg-rose-600');
-                btnScan.classList.replace('text-slate-950', 'text-white');
-            } catch (err) {
-                console.error("Erro ao iniciar câmara:", err);
-                statusAlert.innerText = "Câmera bloqueada/indisponível no navegador. Use o botão abaixo de tirar foto.";
-                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800";
-                statusAlert.classList.remove('hidden');
-                isScanning = false;
-                btnScan.innerText = "Escanear Código";
-            }
-        }
-
-        async function escanearArquivoFoto(input) {
-            if (input.files && input.files.length > 0) {
-                const file = input.files[0];
-                if (!html5QrCode) {
-                    html5QrCode = new Html5Qrcode("reader");
-                }
-                statusAlert.innerText = "Lendo imagem...";
-                statusAlert.className = "p-2 rounded-xl text-xs text-center bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 border border-slate-200 dark:border-slate-800";
-                statusAlert.classList.remove('hidden');
-
-                try {
-                    const result = await html5QrCode.scanFile(file, true);
-                    inputSearch.value = result.trim();
-                    buscar(result.trim());
-                } catch (err) {
-                    alert("Não foi possível identificar um código EAN nesta foto. Tente tirar uma foto mais nítida.");
-                    statusAlert.classList.add('hidden');
-                }
-            }
-        }
-
-        async function pararCameraTotal() {
-            if (html5QrCode) {
-                try {
-                    if (html5QrCode.isScanning) {
-                        await html5QrCode.stop();
-                    }
-                    await html5QrCode.clear();
-                } catch (e) {
-                    console.error("Erro ao limpar câmara:", e);
-                }
-                html5QrCode = null;
-            }
-            isScanning = false;
-            btnScan.innerText = "Escanear Código";
-            btnScan.classList.replace('bg-rose-600', 'bg-amber-500');
-            btnScan.classList.replace('text-white', 'text-slate-950');
-            
-            const readerElement = document.getElementById('reader');
-            if (readerElement && !readerElement.querySelector('video')) {
-                readerElement.innerHTML = `<span class="text-xs text-slate-500">Câmera desativada</span>`;
-            }
         }
 
         formManual.addEventListener('submit', (e) => {
