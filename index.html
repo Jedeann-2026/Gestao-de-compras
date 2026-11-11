@@ -107,7 +107,6 @@
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-200 dark:border-slate-800 space-y-3 shadow-md transition-colors">
             <form id="form-manual" class="flex gap-2">
                 <input type="text" id="input-search" placeholder="Digite o EAN ou nome..." class="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
-                <!-- Botão para ativar/parar câmera ao vivo na mesma linha -->
                 <button type="button" id="btn-scan" onclick="toggleCameraZXing()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3.5 py-2 rounded-xl text-xs transition border border-slate-700 shrink-0" title="Ativar Câmera ao Vivo">
                     <i class="fa-solid fa-camera text-sm"></i>
                 </button>
@@ -264,7 +263,6 @@
         let ultimoTermoPesquisado = '';
         let usuarioLogado = localStorage.getItem('nexxa_usuario_logado') || null;
 
-        // VARIÁVEIS DE CONTROLE DA CÂMERA (ZXING)
         let codeReader = null;
         let isCameraActive = false;
         let selectedDeviceId = null;
@@ -328,10 +326,10 @@
             }
         }
 
+        // INICIALIZAÇÃO DE DATA CORRIGIDA: INÍCIO (6 DIAS ATRÁS) E FIM (HOJE ATUALIZADO)
         function inicializarFiltroDatas() {
             const hoje = new Date();
-            const dataFim = new Date(hoje);
-            dataFim.setDate(hoje.getDate() - 1);
+            const dataFim = new Date(hoje); // Hoje (ex: 11/11)
             
             const dataInicio = new Date(dataFim);
             dataInicio.setDate(dataFim.getDate() - 6);
@@ -369,9 +367,12 @@
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
                 if (error) throw error;
 
-                regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
-                regVendas = cloudData.find(d => d.id === 'vendas');
-                regEntradasBase = cloudData.find(d => d.id === 'entradas');
+                regEstoque = cloudData.find(d => String(d.id || '').trim().toLowerCase() === 'estoque');
+                regVendas = cloudData.find(d => String(d.id || '').trim().toLowerCase() === 'vendas');
+                regEntradasBase = cloudData.find(d => {
+                    const id = String(d.id || '').trim().toLowerCase();
+                    return id === 'entradas' || id === 'compras';
+                });
                 isDataLoaded = true;
                 
                 statusAlert.classList.add('hidden');
@@ -398,7 +399,6 @@
             atualizarListaPendentes();
         });
 
-        // CONTROLADOR DE CÂMERA AO VIVO COM ZXING (ALTAMENTE COMPATÍVEL COM SAFARI/IOS)
         function toggleCameraZXing() {
             if (isCameraActive) {
                 pararCameraZXing();
@@ -422,7 +422,6 @@
                     codeReader = new ZXing.BrowserMultiFormatReader();
                 }
 
-                // Detecta as câmeras do aparelho e escolhe preferencialmente a traseira (environment)
                 const videoInputDevices = await codeReader.listVideoInputDevices();
                 
                 if (videoInputDevices.length === 0) {
@@ -437,13 +436,11 @@
                 
                 selectedDeviceId = backCamera ? backCamera.deviceId : videoInputDevices[videoInputDevices.length - 1].deviceId;
 
-                // Mostra o container do vídeo e esconde o placeholder
                 videoWrapper.classList.remove('hidden');
                 placeholderElem.classList.add('hidden');
                 videoElem.classList.remove('hidden');
                 scanLine.classList.remove('hidden');
 
-                // Altera o visual do botão na barra de pesquisa para indicar estado ativo (vermelho/parar)
                 btnScan.innerHTML = `<i class="fa-solid fa-stop text-sm"></i>`;
                 btnScan.className = "bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-xl text-xs transition shrink-0 font-bold";
                 btnScan.title = "Parar Câmera";
@@ -451,7 +448,6 @@
                 isCameraActive = true;
                 statusAlert.classList.add('hidden');
 
-                // Inicia a decodificação contínua do vídeo ao vivo
                 codeReader.decodeFromVideoDevice(selectedDeviceId, 'video-preview', (result, err) => {
                     if (result) {
                         const eanLido = result.getText().trim();
@@ -465,7 +461,7 @@
 
             } catch (err) {
                 console.error(err);
-                statusAlert.innerText = "Erro ao abrir câmera. Verifique se deu permissão no Safari/iOS.";
+                statusAlert.innerText = "Erro ao abrir câmera. Verifique permissões no Safari/iOS.";
                 statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
                 statusAlert.classList.remove('hidden');
                 pararCameraZXing();
@@ -483,13 +479,11 @@
             const placeholderElem = document.getElementById('video-placeholder');
             const scanLine = document.getElementById('scan-line');
 
-            // Oculta o container inteiro da câmera quando desativada
             if (videoWrapper) videoWrapper.classList.add('hidden');
             if (videoElem) videoElem.classList.add('hidden');
             if (placeholderElem) placeholderElem.classList.remove('hidden');
             if (scanLine) scanLine.classList.add('hidden');
 
-            // Restaura o visual padrão do botão da câmera na linha de pesquisa
             btnScan.innerHTML = `<i class="fa-solid fa-camera text-sm"></i>`;
             btnScan.className = "bg-slate-800 hover:bg-slate-700 text-amber-400 px-3.5 py-2 rounded-xl text-xs transition border border-slate-700 shrink-0";
             btnScan.title = "Ativar Câmera ao Vivo";
@@ -618,21 +612,21 @@
                 }
             }
 
-            let ultimaData = 0;
+            let ultimaData = -1;
             let ultimoPreco = 0;
 
             listaEntradas.forEach(nota => {
                 let itensNota = [];
                 if (nota.itens && Array.isArray(nota.itens)) {
                     itensNota = nota.itens;
-                } else if (nota.ean && (nota.precoUnit || nota.custo)) {
+                } else if (nota.ean && (nota.precoUnit || nota.custo || nota.vlrUnit)) {
                     itensNota = [nota];
                 }
 
                 itensNota.forEach(item => {
                     let itemEan = String(item.ean || item.codigo || item.eanProduto || '').trim();
                     if (itemEan === String(eanAlvo).trim()) {
-                        let dataNotaStr = nota.data || nota.dataFinalizacao || item.data || '';
+                        let dataNotaStr = nota.data || nota.dataFinalizacao || nota.created_at || item.data || '';
                         let dataNota = dataNotaStr ? new Date(dataNotaStr).getTime() : 0;
                         
                         if (dataNota >= ultimaData) {
@@ -764,14 +758,15 @@
             categoriasEncontradas.clear();
             const termoUpper = termo.toUpperCase();
 
+            // 1. Busca no Estoque
             if (regEstoque && regEstoque.data) {
-                for (let k in regEstoque.data) {
-                    let item = regEstoque.data[k];
+                let dadosEstoque = Array.isArray(regEstoque.data) ? regEstoque.data : Object.values(regEstoque.data);
+                dadosEstoque.forEach(item => {
                     let ean = item.ean ? String(item.ean).trim() : '';
                     let nome = item.produto ? String(item.produto).trim().toUpperCase() : '';
 
                     if (item.categoria) categoriasEncontradas.add(item.categoria);
-                    if (!ean || ean === '' || ean === '0') continue;
+                    if (!ean || ean === '' || ean === '0') return;
 
                     if (ean.includes(termo) || nome.includes(termoUpper)) {
                         let key = ean;
@@ -784,13 +779,15 @@
                             };
                         }
                     }
-                }
+                });
             }
 
+            // 2. Busca nas Vendas
             if (regVendas && regVendas.data) {
-                regVendas.data.forEach(v => {
-                    let ean = v.ean ? String(v.ean).trim() : '';
-                    let nome = v.produto ? String(v.produto).trim().toUpperCase() : '';
+                let dadosVendas = Array.isArray(regVendas.data) ? regVendas.data : Object.values(regVendas.data);
+                dadosVendas.forEach(v => {
+                    let ean = String(v.ean || v.codigo || v.eanProduto || '').trim();
+                    let nome = String(v.produto || v.descricao || '').trim().toUpperCase();
 
                     if (v.categoria) categoriasEncontradas.add(v.categoria);
                     if (!ean || ean === '' || ean === '0') return;
@@ -800,7 +797,7 @@
                         if (!produtosMap[key]) {
                             produtosMap[key] = { 
                                 codigo: ean, 
-                                descricao: v.produto, 
+                                descricao: v.produto || v.descricao || 'Produto sem descrição', 
                                 categoria: v.categoria || 'GERAL', 
                                 custo: 0 
                             };
@@ -820,8 +817,16 @@
             statusAlert.classList.add('hidden');
             resultsContainer.innerHTML = "";
 
-            const dataInicioVal = filtroInicio.value ? new Date(filtroInicio.value + 'T00:00:00') : null;
-            const dataFimVal = filtroFim.value ? new Date(filtroFim.value + 'T23:59:59') : null;
+            // PARSE DAS DATAS IGNORANDO FUSO HORÁRIO
+            let tInicio = null, tFim = null;
+            if (filtroInicio.value) {
+                let parts = filtroInicio.value.split('-');
+                tInicio = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0).getTime();
+            }
+            if (filtroFim.value) {
+                let parts = filtroFim.value.split('-');
+                tFim = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59).getTime();
+            }
 
             lista.forEach(info => {
                 let clientMap = {}, cdTotal = 0, lojaTotalSum = 0;
@@ -830,8 +835,8 @@
                 let qtdVendidaGeral = 0;
 
                 if (regEstoque && regEstoque.data) {
-                    for (let k in regEstoque.data) {
-                        let item = regEstoque.data[k];
+                    let dadosEstoque = Array.isArray(regEstoque.data) ? regEstoque.data : Object.values(regEstoque.data);
+                    dadosEstoque.forEach(item => {
                         let itemEan = item.ean ? String(item.ean).trim() : '';
                         if (itemEan === info.codigo) {
                             let cliente = (item.cliente || 'Geral').trim();
@@ -845,15 +850,18 @@
                                 lojaTotalSum += qtd;
                             }
                         }
-                    }
+                    });
                 }
 
+                // PROCESSAMENTO DE VENDAS RESTRITO AO PERÍODO
                 if (regVendas && regVendas.data) {
-                    regVendas.data.forEach(v => {
-                        let vEan = v.ean ? String(v.ean).trim() : '';
+                    let dadosVendas = Array.isArray(regVendas.data) ? regVendas.data : Object.values(regVendas.data);
+
+                    dadosVendas.forEach(v => {
+                        let vEan = String(v.ean || v.codigo || v.eanProduto || '').trim();
                         if (vEan === info.codigo) {
-                            let cliente = (v.cliente || v.loja || 'Geral').trim();
-                            let preco = parseFloat(v.vlrUnit || 0);
+                            let cliente = String(v.cliente || v.loja || v.filial || 'Geral').trim();
+                            let preco = parseFloat(v.vlrUnit || v.valorUnitario || v.preco || v.valor || 0);
                             let qtdV = Number(v.qtd || v.quantidade || 1);
 
                             if (!clientMap[cliente]) {
@@ -863,18 +871,22 @@
                                 clientMap[cliente].preco = preco;
                             }
 
-                            let dataVendaStr = v.data || v.dataVenda || v.created_at || '';
+                            let dataVendaStr = v.data || v.dataVenda || v.created_at || v.dataHora || '';
                             let dentroDoPeriodo = true;
-                            if (dataInicioVal || dataFimVal) {
+
+                            if (tInicio !== null || tFim !== null) {
                                 if (!dataVendaStr) {
                                     dentroDoPeriodo = false;
                                 } else {
-                                    let dataVendaObj = new Date(dataVendaStr);
-                                    if (isNaN(dataVendaObj)) {
-                                        dentroDoPeriodo = false;
+                                    let dataPura = String(dataVendaStr).split('T')[0].split(' ')[0];
+                                    let partsV = dataPura.split('-');
+                                    
+                                    if (partsV.length === 3) {
+                                        let tVenda = new Date(partsV[0], partsV[1] - 1, partsV[2], 12, 0, 0).getTime();
+                                        if (tInicio !== null && tVenda < tInicio) dentroDoPeriodo = false;
+                                        if (tFim !== null && tVenda > tFim) dentroDoPeriodo = false;
                                     } else {
-                                        if (dataInicioVal && dataVendaObj < dataInicioVal) dentroDoPeriodo = false;
-                                        if (dataFimVal && dataVendaObj > dataFimVal) dentroDoPeriodo = false;
+                                        dentroDoPeriodo = false;
                                     }
                                 }
                             }
@@ -904,17 +916,17 @@
                 ` : '';
 
                 let ultimoPrecoCompra = obterUltimoPrecoCompra(info.codigo);
+                let me_custo = ultimoPrecoCompra > 0 ? ultimoPrecoCompra : (info.custo || 0);
                 let ultimoPrecoHtml = `
                     <div class="flex justify-between font-mono text-cyan-600 dark:text-cyan-400 pt-1 border-t border-emerald-200 dark:border-emerald-900/40">
                         <span>Último Preço Custo:</span>
-                        <strong>${Number(ultimoPrecoCompra).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+                        <strong>${Number(me_custo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
                     </div>
                 `;
 
-                let custoSugerido = ultimoPrecoCompra > 0 ? ultimoPrecoCompra : (info.custo || '');
+                let custoSugerido = me_custo > 0 ? me_custo : '';
 
                 let todasLojasSet = new Set([...Object.keys(clientMap), ...Object.keys(vendasPorLojaMap)]);
-
                 let detalhesLojaHtml = "";
                 
                 if (todasLojasSet.size === 0) {
@@ -1256,7 +1268,7 @@
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
                 if (error) throw error;
 
-                let regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
+                let regEstoque = cloudData.find(d => String(d.id || '').trim().toLowerCase() === 'estoque');
                 let estoqueData = regEstoque ? (regEstoque.data || {}) : {};
                 
                 let novoKey = "ITEM_" + Date.now();
@@ -1314,7 +1326,7 @@
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
                 if (error) throw error;
 
-                let regEntradas = cloudData.find(d => d.id === 'entradas');
+                let regEntradas = cloudData.find(d => String(d.id || '').trim().toLowerCase() === 'entradas');
                 let entradasData = {};
                 
                 if (regEntradas && regEntradas.data && !Array.isArray(regEntradas.data)) {
@@ -1334,7 +1346,7 @@
 
                 numeroPedidoAtual = numPedidoValidado;
 
-                let regEstoque = cloudData.find(d => d.id === 'estoque' || d.id === 'ESTOQUE');
+                let regEstoque = cloudData.find(d => String(d.id || '').trim().toLowerCase() === 'estoque');
                 if (!regEstoque) throw new Error("Registro de estoque não encontrado.");
 
                 let estoqueData = regEstoque.data || {};
