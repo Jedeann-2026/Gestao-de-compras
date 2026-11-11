@@ -103,16 +103,35 @@
             <div id="scan-line" class="hidden absolute left-7 right-7 top-1/2 h-0.5 bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-pulse pointer-events-none"></div>
         </div>
 
-        <!-- BUSCA MANUAL, BOTÃO DA CÂMERA NA MESMA LINHA E FILTRO DE PERÍODO -->
+        <!-- BUSCA POR CATEGORIA, PRODUTO VINCULADO, PESQUISA TEXTUAL E FILTRO DE PERÍODO -->
         <div class="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-slate-200 dark:border-slate-800 space-y-3 shadow-md transition-colors">
-            <form id="form-manual" class="flex gap-2">
-                <input type="text" id="input-search" placeholder="Digite o EAN ou nome..." class="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
-                <button type="button" id="btn-scan" onclick="toggleCameraZXing()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3.5 py-2 rounded-xl text-xs transition border border-slate-700 shrink-0" title="Ativar Câmera ao Vivo">
-                    <i class="fa-solid fa-camera text-sm"></i>
-                </button>
-                <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-3.5 py-2 rounded-xl text-xs transition shrink-0 font-bold" title="Pesquisar">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                </button>
+            <form id="form-manual" class="space-y-2">
+                <!-- SELEÇÃO DE CATEGORIA E PRODUTO -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1 font-semibold">Categoria</label>
+                        <select id="select-filtro-categoria" onchange="aoSelecionarCategoriaFiltro()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                            <option value="">Todas as Categorias</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1 font-semibold">Produto</label>
+                        <select id="select-filtro-produto" onchange="aoSelecionarProdutoFiltro()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                            <option value="">Selecione o produto...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- CAMPO CONTÉM / EAN COM BOTÕES -->
+                <div class="flex gap-2 pt-1">
+                    <input type="text" id="input-search" placeholder="Contém (EAN ou parte do nome)..." class="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                    <button type="button" id="btn-scan" onclick="toggleCameraZXing()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3.5 py-2 rounded-xl text-xs transition border border-slate-700 shrink-0" title="Ativar Câmera ao Vivo">
+                        <i class="fa-solid fa-camera text-sm"></i>
+                    </button>
+                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-3.5 py-2 rounded-xl text-xs transition shrink-0 font-bold" title="Pesquisar">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </div>
             </form>
             
             <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200 dark:border-slate-800">
@@ -257,6 +276,7 @@
         let regEstoque = null, regVendas = null, regEntradasBase = null;
         let isDataLoaded = false;
         let categoriasEncontradas = new Set();
+        let produtosPorCategoriaMap = {}; // Estrutura para vincular categoria aos produtos
         let itensPedido = [];
         let rascunhos = JSON.parse(localStorage.getItem('nexxa_rascunhos_pedidos') || '{}');
         let numeroPedidoAtual = Number(localStorage.getItem('nexxa_num_pedido') || 1);
@@ -276,6 +296,9 @@
         const filtroFim = document.getElementById('filtro-fim');
         const resultsContainer = document.getElementById('results-container');
         const statusAlert = document.getElementById('status-alert');
+
+        const selectFiltroCategoria = document.getElementById('select-filtro-categoria');
+        const selectFiltroProduto = document.getElementById('select-filtro-produto');
 
         const modalCadastro = document.getElementById('modal-cadastro');
         const btnFecharModal = document.getElementById('btn-fechar-modal');
@@ -326,10 +349,9 @@
             }
         }
 
-        // INICIALIZAÇÃO DE DATA CORRIGIDA: INÍCIO (6 DIAS ATRÁS) E FIM (HOJE ATUALIZADO)
         function inicializarFiltroDatas() {
             const hoje = new Date();
-            const dataFim = new Date(hoje); // Hoje (ex: 11/11)
+            const dataFim = new Date(hoje);
             
             const dataInicio = new Date(dataFim);
             dataInicio.setDate(dataFim.getDate() - 6);
@@ -375,10 +397,84 @@
                 });
                 isDataLoaded = true;
                 
+                popularFiltroCategoriasEProdutos();
                 statusAlert.classList.add('hidden');
             } catch (err) {
                 statusAlert.innerText = "Erro ao carregar dados: " + err.message;
                 statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
+            }
+        }
+
+        // POPULA OS CAMPOS DE CATEGORIA E PRODUTO COM OS DADOS CARREGADOS
+        function popularFiltroCategoriasEProdutos() {
+            categoriasEncontradas.clear();
+            produtosPorCategoriaMap = {};
+
+            const registrarProduto = (cat, ean, nome) => {
+                if (!cat) cat = 'GERAL';
+                cat = cat.trim().toUpperCase();
+                categoriasEncontradas.add(cat);
+
+                if (!produtosPorCategoriaMap[cat]) {
+                    produtosPorCategoriaMap[cat] = new Map();
+                }
+                if (ean && ean !== '0') {
+                    produtosPorCategoriaMap[cat].set(ean, nome);
+                }
+            };
+
+            if (regEstoque && regEstoque.data) {
+                let dados = Array.isArray(regEstoque.data) ? regEstoque.data : Object.values(regEstoque.data);
+                dados.forEach(i => registrarProduto(i.categoria, String(i.ean || '').trim(), String(i.produto || '').trim()));
+            }
+
+            if (regVendas && regVendas.data) {
+                let dados = Array.isArray(regVendas.data) ? regVendas.data : Object.values(regVendas.data);
+                dados.forEach(v => registrarProduto(v.categoria, String(v.ean || v.codigo || v.eanProduto || '').trim(), String(v.produto || v.descricao || '').trim()));
+            }
+
+            selectFiltroCategoria.innerHTML = `<option value="">Todas as Categorias</option>`;
+            Array.from(categoriasEncontradas).sort().forEach(cat => {
+                let opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                selectFiltroCategoria.appendChild(opt);
+            });
+
+            aoSelecionarCategoriaFiltro();
+        }
+
+        function aoSelecionarCategoriaFiltro() {
+            const catSelecionada = selectFiltroCategoria.value;
+            selectFiltroProduto.innerHTML = `<option value="">Selecione o produto...</option>`;
+
+            let produtosMap = new Map();
+
+            if (catSelecionada) {
+                if (produtosPorCategoriaMap[catSelecionada]) {
+                    produtosMap = produtosPorCategoriaMap[catSelecionada];
+                }
+            } else {
+                Object.values(produtosPorCategoriaMap).forEach(mapProds => {
+                    mapProds.forEach((nome, ean) => produtosMap.set(ean, nome));
+                });
+            }
+
+            const produtosOrdenados = Array.from(produtosMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+
+            produtosOrdenados.forEach(([ean, nome]) => {
+                let opt = document.createElement('option');
+                opt.value = ean;
+                opt.textContent = `${nome} (${ean})`;
+                selectFiltroProduto.appendChild(opt);
+            });
+        }
+
+        function aoSelecionarProdutoFiltro() {
+            const eanSelecionado = selectFiltroProduto.value;
+            if (eanSelecionado) {
+                inputSearch.value = eanSelecionado;
+                buscar(eanSelecionado);
             }
         }
 
@@ -732,7 +828,11 @@
         formManual.addEventListener('submit', (e) => {
             e.preventDefault();
             const termo = inputSearch.value.trim();
-            if (termo) buscar(termo);
+            if (termo) {
+                buscar(termo);
+            } else if (selectFiltroCategoria.value) {
+                buscar('');
+            }
         });
 
         btnFecharModal.addEventListener('click', () => {
@@ -748,14 +848,15 @@
                 return;
             }
 
+            const catFiltro = selectFiltroCategoria.value;
+
             if (exibirAlerta) {
-                statusAlert.innerText = `Buscando "${termo}"...`;
+                statusAlert.innerText = termo ? `Buscando "${termo}"...` : (catFiltro ? `Filtrando por "${catFiltro}"...` : "Carregando busca...");
                 statusAlert.className = "p-2 rounded-xl text-xs text-center bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 border border-slate-200 dark:border-slate-800";
                 statusAlert.classList.remove('hidden');
             }
 
             let produtosMap = {};
-            categoriasEncontradas.clear();
             const termoUpper = termo.toUpperCase();
 
             // 1. Busca no Estoque
@@ -764,11 +865,15 @@
                 dadosEstoque.forEach(item => {
                     let ean = item.ean ? String(item.ean).trim() : '';
                     let nome = item.produto ? String(item.produto).trim().toUpperCase() : '';
+                    let itemCat = item.categoria ? String(item.categoria).trim().toUpperCase() : 'GERAL';
 
-                    if (item.categoria) categoriasEncontradas.add(item.categoria);
                     if (!ean || ean === '' || ean === '0') return;
 
-                    if (ean.includes(termo) || nome.includes(termoUpper)) {
+                    // Aplica Filtro de Categoria se Selecionado
+                    if (catFiltro && itemCat !== catFiltro) return;
+
+                    // Aplica Filtro de Texto (EAN ou Nome Contém)
+                    if (!termoUpper || ean.includes(termo) || nome.includes(termoUpper)) {
                         let key = ean;
                         if (!produtosMap[key]) {
                             produtosMap[key] = { 
@@ -788,11 +893,15 @@
                 dadosVendas.forEach(v => {
                     let ean = String(v.ean || v.codigo || v.eanProduto || '').trim();
                     let nome = String(v.produto || v.descricao || '').trim().toUpperCase();
+                    let itemCat = v.categoria ? String(v.categoria).trim().toUpperCase() : 'GERAL';
 
-                    if (v.categoria) categoriasEncontradas.add(v.categoria);
                     if (!ean || ean === '' || ean === '0') return;
 
-                    if (ean.includes(termo) || nome.includes(termoUpper)) {
+                    // Aplica Filtro de Categoria se Selecionado
+                    if (catFiltro && itemCat !== catFiltro) return;
+
+                    // Aplica Filtro de Texto (EAN ou Nome Contém)
+                    if (!termoUpper || ean.includes(termo) || nome.includes(termoUpper)) {
                         let key = ean;
                         if (!produtosMap[key]) {
                             produtosMap[key] = { 
@@ -810,7 +919,7 @@
             if (lista.length === 0) {
                 statusAlert.classList.add('hidden');
                 resultsContainer.innerHTML = "";
-                if (exibirAlerta) abrirModalCadastro(termo);
+                if (exibirAlerta && termo) abrirModalCadastro(termo);
                 return;
             }
 
