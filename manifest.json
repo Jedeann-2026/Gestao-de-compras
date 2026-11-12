@@ -1,0 +1,15 @@
+{
+  "name": "AB Conveniência - Compras",
+  "short_name": "AB Compras",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "https://mjkqkyuolsqhtxwzivof.supabase.co/storage/v1/object/public/produtos-imagens/logoab.jpeg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
