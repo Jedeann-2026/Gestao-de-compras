@@ -574,7 +574,7 @@
                 console.error(err);
                 statusAlert.innerText = "Erro ao abrir câmera. Verifique permissões no Safari/iOS.";
                 statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
-                statusAlert.classList.add('hidden');
+                statusAlert.classList.remove('hidden');
                 pararCameraZXing();
             }
         }
@@ -764,7 +764,6 @@
             const custo = parseFloat(inputCusto.value) || 0;
             const margem = parseFloat(inputMargem.value) || 0;
             
-            // Fórmula atualizada: custo / (1 - (margem / 100))
             const divisor = 1 - (margem / 100);
             const precoSugerido = divisor > 0 ? (custo / divisor) : 0;
 
@@ -1247,6 +1246,34 @@
             atualizarInterfacePedido();
         }
 
+        function editarItemPedido(codigo, lojaDestino) {
+            const item = itensPedido.find(i => i.codigo === codigo && (i.lojaDestino || 'Geral') === lojaDestino);
+            if (!item) return;
+
+            let novaQtdStr = prompt(`Editar item: ${item.descricao} (${item.lojaDestino})\nInforme a nova Quantidade:`, item.qtd);
+            if (novaQtdStr === null) return;
+            let novaQtd = Number(novaQtdStr);
+            if (isNaN(novaQtd) || novaQtd <= 0) {
+                alert("Quantidade inválida.");
+                return;
+            }
+
+            let novoCustoStr = prompt(`Editar item: ${item.descricao} (${item.lojaDestino})\nInforme o novo Preço de Custo Unitário (R$):`, item.custo);
+            if (novoCustoStr === null) return;
+            let novoCusto = parseFloat(novoCustoStr);
+            if (isNaN(novoCusto) || novoCusto < 0) {
+                alert("Preço de custo inválido.");
+                return;
+            }
+
+            item.qtd = novaQtd;
+            item.custo = novoCusto;
+            item.subtotal = novaQtd * novoCusto;
+
+            salvarEstadoPedidoAtual();
+            atualizarInterfacePedido();
+        }
+
         function removerDoPedido(codigo, lojaDestino = 'Geral') {
             itensPedido = itensPedido.filter(i => !(i.codigo === codigo && (i.lojaDestino || 'Geral') === lojaDestino));
             salvarEstadoPedidoAtual();
@@ -1318,18 +1345,22 @@
 
             itensPedido.forEach(item => {
                 totalGeral += item.subtotal;
+                let lojaNome = item.lojaDestino || 'Geral';
                 let div = document.createElement('div');
                 div.className = "flex justify-between items-center bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs transition-colors";
                 div.innerHTML = `
                     <div class="flex-1 pr-2">
-                        <div class="font-bold text-slate-900 dark:text-white truncate max-w-[190px]">${item.descricao}</div>
+                        <div class="font-bold text-slate-900 dark:text-white truncate max-w-[170px]">${item.descricao}</div>
                         <div class="text-[10px] text-slate-500 dark:text-slate-400">
-                            EAN: ${item.codigo} | Loja: <span class="font-semibold text-amber-600 dark:text-amber-400">${item.lojaDestino || 'Geral'}</span> | ${item.qtd}x ${item.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            EAN: ${item.codigo} | Loja: <span class="font-semibold text-amber-600 dark:text-amber-400">${lojaNome}</span> | ${item.qtd}x ${item.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </div>
                     </div>
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2">
                         <span class="font-mono font-bold text-amber-600 dark:text-amber-400">${item.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        <button onclick="removerDoPedido('${item.codigo}', '${(item.lojaDestino || 'Geral').replace(/'/g, "\\'")}')" class="text-slate-400 hover:text-rose-500 p-1" title="Excluir item">
+                        <button onclick="editarItemPedido('${item.codigo}', '${lojaNome.replace(/'/g, "\\'")}')" class="text-slate-400 hover:text-amber-500 p-1" title="Editar quantidade ou preço">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </button>
+                        <button onclick="removerDoPedido('${item.codigo}', '${lojaNome.replace(/'/g, "\\'")}')" class="text-slate-400 hover:text-rose-500 p-1" title="Excluir item">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
