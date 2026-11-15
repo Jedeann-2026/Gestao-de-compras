@@ -128,12 +128,17 @@
                 </div>
 
                 <!-- CAMPO CONTÉM / EAN COM BOTÕES -->
-                <div class="flex gap-2 pt-1">
-                    <input type="text" id="input-search" placeholder="Contém (EAN ou parte do nome)..." class="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
-                    <button type="button" id="btn-scan" onclick="toggleCameraZXing()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3.5 py-2 rounded-xl text-xs transition border border-slate-700 shrink-0" title="Ativar Câmera ao Vivo">
+                <div class="flex gap-1.5 pt-1">
+                    <div class="relative flex-1">
+                        <input type="text" id="input-search" oninput="aoDigitarBusca()" placeholder="Contém (EAN ou parte do nome)..." class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl pl-3 pr-7 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                        <button type="button" id="btn-limpar-consulta" onclick="limparConsultaProduto()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 p-1" title="Limpar consulta e manter apenas período">
+                            <i class="fa-solid fa-circle-xmark text-xs"></i>
+                        </button>
+                    </div>
+                    <button type="button" id="btn-scan" onclick="toggleCameraZXing()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-2 rounded-xl text-xs transition border border-slate-700 shrink-0" title="Ativar Câmera ao Vivo">
                         <i class="fa-solid fa-camera text-sm"></i>
                     </button>
-                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-3.5 py-2 rounded-xl text-xs transition shrink-0 font-bold" title="Pesquisar">
+                    <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-2 rounded-xl text-xs transition shrink-0 font-bold" title="Pesquisar">
                         <i class="fa-solid fa-magnifying-glass"></i>
                     </button>
                 </div>
@@ -142,18 +147,34 @@
             <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200 dark:border-slate-800">
                 <div>
                     <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">Data Inicial</label>
-                    <input type="date" id="filtro-inicio" onchange="dispararBuscaRecorrente()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2 py-1.5 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                    <input type="date" id="filtro-inicio" onchange="aoAlterarPeriodo()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2 py-1.5 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                 </div>
                 <div>
                     <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">Data Final</label>
-                    <input type="date" id="filtro-fim" onchange="dispararBuscaRecorrente()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2 py-1.5 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                    <input type="date" id="filtro-fim" onchange="aoAlterarPeriodo()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2 py-1.5 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                 </div>
             </div>
         </div>
 
         <div id="status-alert" class="hidden p-2 rounded-xl text-xs text-center"></div>
 
-        <!-- RESULTADOS DA BUSCA -->
+        <!-- CONSULTA SEPARADA DE COMPRAS DO PRODUTO SELECIONADO (POR PEDIDO, ÚLTIMA COMPRA NO INÍCIO) -->
+        <div id="container-compras-produto" class="hidden bg-white dark:bg-slate-900 rounded-2xl p-4 border-2 border-cyan-500/40 dark:border-cyan-500/30 space-y-3 shadow-xl transition-colors">
+            <div class="flex justify-between items-start gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5">
+                <div class="min-w-0">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-cyan-400 flex items-center gap-1">
+                        <i class="fa-solid fa-magnifying-glass-dollar"></i> Onde foi comprado (Por Pedido)
+                    </span>
+                    <h3 id="titulo-compras-produto" class="font-bold text-slate-900 dark:text-white text-xs truncate mt-0.5">-</h3>
+                </div>
+                <button type="button" onclick="limparConsultaProduto()" class="text-[10px] bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-100 px-2 py-1 rounded-lg font-semibold shrink-0 flex items-center gap-1">
+                    <i class="fa-solid fa-xmark"></i> Limpar Consulta
+                </button>
+            </div>
+            <div id="lista-compras-produto" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+        </div>
+
+        <!-- RESULTADOS DA BUSCA DE ESTOQUE/VENDAS -->
         <div id="results-container" class="space-y-4"></div>
 
         <!-- PAINEL DE PEDIDOS PENDENTES (RASCUNHOS) -->
@@ -195,10 +216,19 @@
                 </div>
             </div>
 
-            <!-- CAMPO DE FORNECEDOR -->
-            <div>
-                <label class="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Fornecedor / Distribuidor</label>
-                <input type="text" id="input-fornecedor" oninput="salvarEstadoPedidoAtual()" placeholder="Ex: Distribuidora São Paulo" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+            <!-- CAMPO DE FORNECEDOR E LOJA DA COMPRA -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                    <label class="text-[10px] text-slate-500 dark:text-slate-400 block mb-1">Fornecedor / Distribuidor</label>
+                    <input type="text" id="input-fornecedor" oninput="salvarEstadoPedidoAtual()" placeholder="Ex: Distribuidora São Paulo" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-500 dark:text-slate-400 block mb-1 font-semibold text-amber-600 dark:text-amber-400">Loja onde foi comprada</label>
+                    <select id="select-loja-compra" onchange="salvarEstadoPedidoAtual()" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                        <option value="">Selecione a loja da compra...</option>
+                        <option value="CD">CD</option>
+                    </select>
+                </div>
             </div>
             
             <div id="lista-pedido" class="space-y-2 max-h-60 overflow-y-auto pr-1">
@@ -219,6 +249,30 @@
                 <div id="aviso-convidado-gravar" class="hidden w-full bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold py-3 rounded-xl text-xs text-center border border-slate-300 dark:border-slate-700">
                     <i class="fa-solid fa-lock mr-1"></i> Perfil Convidado (Modo Leitura / Sem Gravação)
                 </div>
+            </div>
+        </div>
+
+        <!-- HISTÓRICO DE COMPRAS POR PERÍODO -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xl transition-colors">
+            <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
+                <div>
+                    <h2 class="font-bold text-amber-600 dark:text-amber-400 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                        <i class="fa-solid fa-receipt"></i> Histórico de Compras (Período)
+                    </h2>
+                    <span id="label-periodo-historico" class="text-[10px] text-slate-400 dark:text-slate-500 block mt-0.5">Filtrado pelas datas selecionadas acima</span>
+                </div>
+                <select id="filtro-loja-historico" onchange="renderizarHistoricoCompras()" class="text-[11px] rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-2 py-1 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-amber-400">
+                    <option value="">Todas as Lojas</option>
+                </select>
+            </div>
+
+            <div id="resumo-historico-periodo" class="bg-slate-50 dark:bg-slate-950 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+                <span class="text-slate-500 dark:text-slate-400">Total Comprado no Período:</span>
+                <span id="total-historico-periodo" class="font-bold text-amber-600 dark:text-amber-400 font-mono">R$ 0,00</span>
+            </div>
+
+            <div id="lista-historico-compras" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                <p class="text-[11px] text-slate-400 dark:text-slate-500 text-center py-4">Carregando histórico de compras...</p>
             </div>
         </div>
     </div>
@@ -248,7 +302,11 @@
                     <select id="cad-categoria" class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
                     </select>
                 </div>
-                <div class="grid grid-cols-2 gap-2 pt-2">
+                <div class="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-xl px-3 py-2 text-[11px] text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                    <i class="fa-solid fa-warehouse"></i>
+                    <span>Loja de registro inicial: <strong>CD</strong></span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 pt-1">
                     <div>
                         <label class="text-[11px] text-slate-500 dark:text-slate-400 block mb-1">Qtd Comprada</label>
                         <input type="number" id="cad-qtd" min="1" value="1" required class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
@@ -259,9 +317,37 @@
                     </div>
                 </div>
                 <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 rounded-xl text-xs transition mt-2">
-                    Salvar e Adicionar ao Pedido
+                    Salvar no CD e Adicionar ao Pedido
                 </button>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE DETALHES DA COMPRA (POR LOJA) -->
+    <div id="modal-detalhe-compra" class="fixed inset-0 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 w-full max-w-md max-h-[85vh] flex flex-col space-y-4 shadow-2xl transition-colors">
+            <div class="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
+                <div>
+                    <h3 id="detalhe-nota-titulo" class="text-amber-600 dark:text-amber-400 font-bold text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice"></i> Nota #0000
+                    </h3>
+                    <span id="detalhe-nota-subtitulo" class="text-[10px] text-slate-500 dark:text-slate-400 block">Fornecedor • Data</span>
+                </div>
+                <button type="button" onclick="fecharModalDetalheCompra()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div id="detalhe-nota-cabecalho" class="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-1.5 shrink-0">
+            </div>
+
+            <div id="detalhe-nota-conteudo-lojas" class="flex-1 overflow-y-auto space-y-3 pr-1">
+            </div>
+
+            <div class="border-t border-slate-200 dark:border-slate-800 pt-3 flex justify-between items-center shrink-0">
+                <span class="text-xs text-slate-500 dark:text-slate-400 font-semibold">Total Geral / Filtrado:</span>
+                <span id="detalhe-nota-total" class="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono">R$ 0,00</span>
+            </div>
         </div>
     </div>
 
@@ -287,6 +373,8 @@
         let numeroPedidoAtual = Number(localStorage.getItem('nexxa_num_pedido') || 1);
         let ultimoTermoPesquisado = '';
         let usuarioLogado = localStorage.getItem('nexxa_usuario_logado') || null;
+        let notasHistoricoMap = {};
+        let eanFiltroDetalheModal = null; // Armazena EAN se a abertura veio de consulta de produto específico
 
         let codeReader = null;
         let isCameraActive = false;
@@ -297,13 +385,17 @@
         const btnScan = document.getElementById('btn-scan');
         const formManual = document.getElementById('form-manual');
         const inputSearch = document.getElementById('input-search');
+        const btnLimparConsulta = document.getElementById('btn-limpar-consulta');
         const filtroInicio = document.getElementById('filtro-inicio');
         const filtroFim = document.getElementById('filtro-fim');
         const resultsContainer = document.getElementById('results-container');
         const statusAlert = document.getElementById('status-alert');
+        const containerComprasProduto = document.getElementById('container-compras-produto');
 
         const selectFiltroCategoria = document.getElementById('select-filtro-categoria');
         const selectFiltroProduto = document.getElementById('select-filtro-produto');
+        const selectLojaCompra = document.getElementById('select-loja-compra');
+        const filtroLojaHistorico = document.getElementById('filtro-loja-historico');
 
         const modalCadastro = document.getElementById('modal-cadastro');
         const btnFecharModal = document.getElementById('btn-fechar-modal');
@@ -403,10 +495,41 @@
                 isDataLoaded = true;
                 
                 popularFiltroCategoriasEProdutos();
+                popularSelectsLojas();
+                carregarPedidoAtual();
+                renderizarHistoricoCompras();
                 statusAlert.classList.add('hidden');
             } catch (err) {
                 statusAlert.innerText = "Erro ao carregar dados: " + err.message;
                 statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
+            }
+        }
+
+        function popularSelectsLojas() {
+            const lojasOrdenadas = Array.from(lojasConhecidas).sort();
+            const valorAtualCompra = selectLojaCompra.value || (rascunhos[String(numeroPedidoAtual)] ? rascunhos[String(numeroPedidoAtual)].lojaCompra : '');
+            const valorAtualHist = filtroLojaHistorico.value;
+
+            selectLojaCompra.innerHTML = `<option value="">Selecione a loja da compra...</option><option value="CD">CD</option>`;
+            filtroLojaHistorico.innerHTML = `<option value="">Todas as Lojas</option><option value="CD">CD</option>`;
+
+            lojasOrdenadas.forEach(loja => {
+                let opt1 = document.createElement('option');
+                opt1.value = loja;
+                opt1.textContent = loja;
+                selectLojaCompra.appendChild(opt1);
+
+                let opt2 = document.createElement('option');
+                opt2.value = loja;
+                opt2.textContent = loja;
+                filtroLojaHistorico.appendChild(opt2);
+            });
+
+            if (valorAtualCompra) {
+                selectLojaCompra.value = valorAtualCompra;
+            }
+            if (valorAtualHist) {
+                filtroLojaHistorico.value = valorAtualHist;
             }
         }
 
@@ -494,8 +617,40 @@
             const eanSelecionado = selectFiltroProduto.value;
             if (eanSelecionado) {
                 inputSearch.value = eanSelecionado;
+                atualizarVisibilidadeBotaoLimpar();
                 buscar(eanSelecionado);
+            } else {
+                limparConsultaProduto();
             }
+        }
+
+        function aoDigitarBusca() {
+            atualizarVisibilidadeBotaoLimpar();
+            if (inputSearch.value.trim() === '' && selectFiltroProduto.value === '') {
+                limparConsultaProduto(false);
+            }
+        }
+
+        function atualizarVisibilidadeBotaoLimpar() {
+            const temTexto = inputSearch.value.trim() !== '';
+            const temProduto = selectFiltroProduto.value !== '';
+            if (temTexto || temProduto) {
+                btnLimparConsulta.classList.remove('hidden');
+            } else {
+                btnLimparConsulta.classList.add('hidden');
+            }
+        }
+
+        function limparConsultaProduto(focarInput = false) {
+            inputSearch.value = '';
+            selectFiltroProduto.value = '';
+            ultimoTermoPesquisado = '';
+            resultsContainer.innerHTML = '';
+            containerComprasProduto.classList.add('hidden');
+            statusAlert.classList.add('hidden');
+            btnLimparConsulta.classList.add('hidden');
+            renderizarHistoricoCompras();
+            if (focarInput) inputSearch.focus();
         }
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -558,7 +713,7 @@
                 scanLine.classList.remove('hidden');
 
                 btnScan.innerHTML = `<i class="fa-solid fa-stop text-sm"></i>`;
-                btnScan.className = "bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-xl text-xs transition shrink-0 font-bold";
+                btnScan.className = "bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-xl text-xs transition shrink-0 font-bold";
                 btnScan.title = "Parar Câmera";
                 
                 isCameraActive = true;
@@ -570,6 +725,7 @@
                         if (navigator.vibrate) navigator.vibrate(100);
 
                         inputSearch.value = eanLido;
+                        atualizarVisibilidadeBotaoLimpar();
                         pararCameraZXing();
                         buscar(eanLido);
                     }
@@ -601,8 +757,13 @@
             if (scanLine) scanLine.classList.add('hidden');
 
             btnScan.innerHTML = `<i class="fa-solid fa-camera text-sm"></i>`;
-            btnScan.className = "bg-slate-800 hover:bg-slate-700 text-amber-400 px-3.5 py-2 rounded-xl text-xs transition border border-slate-700 shrink-0";
+            btnScan.className = "bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-2 rounded-xl text-xs transition border border-slate-700 shrink-0";
             btnScan.title = "Ativar Câmera ao Vivo";
+        }
+
+        function aoAlterarPeriodo() {
+            dispararBuscaRecorrente();
+            renderizarHistoricoCompras();
         }
 
         function dispararBuscaRecorrente() {
@@ -626,12 +787,14 @@
 
         function salvarEstadoPedidoAtual() {
             const fornecedor = document.getElementById('input-fornecedor').value;
+            const lojaCompra = document.getElementById('select-loja-compra').value;
             const numKey = String(numeroPedidoAtual);
 
-            if (itensPedido.length > 0 || fornecedor.trim() !== '') {
+            if (itensPedido.length > 0 || fornecedor.trim() !== '' || lojaCompra.trim() !== '') {
                 rascunhos[numKey] = {
                     numero: numeroPedidoAtual,
                     fornecedor: fornecedor,
+                    lojaCompra: lojaCompra,
                     itens: itensPedido,
                     dataAtualizacao: new Date().toISOString()
                 };
@@ -648,9 +811,11 @@
             const numKey = String(numeroPedidoAtual);
             if (rascunhos[numKey]) {
                 document.getElementById('input-fornecedor').value = rascunhos[numKey].fornecedor || '';
+                document.getElementById('select-loja-compra').value = rascunhos[numKey].lojaCompra || '';
                 itensPedido = rascunhos[numKey].itens || [];
             } else {
                 document.getElementById('input-fornecedor').value = '';
+                document.getElementById('select-loja-compra').value = '';
                 itensPedido = [];
             }
             atualizarInterfacePedido();
@@ -693,17 +858,18 @@
                 const r = rascunhos[key];
                 const isAtual = Number(key) === numeroPedidoAtual;
                 const totalItens = (r.itens || []).reduce((acc, i) => acc + i.qtd, 0);
+                const lojaInfo = r.lojaCompra ? ` • ${r.lojaCompra}` : '';
 
                 let div = document.createElement('div');
                 div.onclick = () => selecionarRascunho(key);
                 div.className = `flex justify-between items-center p-2 rounded-xl text-xs cursor-pointer border transition ${isAtual ? 'bg-amber-50 dark:bg-slate-800 border-amber-500 text-amber-600 dark:text-amber-400' : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'}`;
                 
                 div.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span class="font-mono font-bold">#${String(r.numero).padStart(4, '0')}</span>
-                        <span class="truncate max-w-[120px] text-slate-500 dark:text-slate-400">${r.fornecedor || 'Sem Fornecedor'}</span>
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="font-mono font-bold shrink-0">#${String(r.numero).padStart(4, '0')}</span>
+                        <span class="truncate text-slate-500 dark:text-slate-400">${(r.fornecedor || 'Sem Fornecedor') + lojaInfo}</span>
                     </div>
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3 shrink-0">
                         <span class="text-[10px] bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">${totalItens} itens</span>
                         <button onclick="excluirRascunho('${key}', event)" class="text-slate-400 hover:text-rose-500 p-1">
                             <i class="fa-solid fa-xmark"></i>
@@ -781,12 +947,14 @@
                 return;
             }
             const fornecedor = document.getElementById('input-fornecedor').value.trim() || 'Não informado';
+            const lojaCompra = document.getElementById('select-loja-compra').value.trim() || 'Não informada';
             const numPedidoFormatted = String(numeroPedidoAtual).padStart(4, '0');
             const tipoExportacao = document.getElementById('select-exportacao').value;
             let dadosExcel = [];
             dadosExcel.push(["PEDIDO DE COMPRAS", `#${numPedidoFormatted}`]);
             dadosExcel.push(["USUÁRIO EMISSOR", usuarioLogado]);
             dadosExcel.push(["FORNECEDOR", fornecedor]);
+            dadosExcel.push(["LOJA DA COMPRA", lojaCompra]);
             dadosExcel.push(["DATA EXPORTAÇÃO", new Date().toLocaleDateString('pt-BR')]);
             dadosExcel.push([]);
             if (tipoExportacao === 'unificado') {
@@ -864,10 +1032,13 @@
         formManual.addEventListener('submit', (e) => {
             e.preventDefault();
             const termo = inputSearch.value.trim();
+            atualizarVisibilidadeBotaoLimpar();
             if (termo) {
                 buscar(termo);
             } else if (selectFiltroCategoria.value) {
                 buscar('');
+            } else {
+                limparConsultaProduto();
             }
         });
 
@@ -875,8 +1046,138 @@
             modalCadastro.classList.add('hidden');
         });
 
+        // =========================================================================
+        // CONSULTA SEPARADA DE COMPRAS DO PRODUTO SELECIONADO (ÚLTIMA NO INÍCIO)
+        // =========================================================================
+        function renderizarComprasDoProdutoSelecionado(listaProdutosEncontrados, termoOriginal) {
+            const listaContainer = document.getElementById('lista-compras-produto');
+            const tituloEl = document.getElementById('titulo-compras-produto');
+
+            const eansAlvo = new Set(listaProdutosEncontrados.map(p => String(p.codigo).trim()));
+            if (/^\d+$/.test(termoOriginal.trim())) {
+                eansAlvo.add(termoOriginal.trim());
+            }
+
+            if (eansAlvo.size === 0) {
+                containerComprasProduto.classList.add('hidden');
+                return;
+            }
+
+            if (listaProdutosEncontrados.length === 1) {
+                tituloEl.innerText = `${listaProdutosEncontrados[0].descricao} (EAN: ${listaProdutosEncontrados[0].codigo})`;
+            } else {
+                tituloEl.innerText = `Consulta: "${termoOriginal}" (${listaProdutosEncontrados.length} produtos)`;
+            }
+
+            let registrosCompraProduto = [];
+
+            if (regEntradasBase && regEntradasBase.data) {
+                let entradasObj = Array.isArray(regEntradasBase.data)
+                    ? regEntradasBase.data.reduce((acc, item, idx) => ({ ...acc, [`IDX_${idx}`]: item }), {})
+                    : regEntradasBase.data;
+
+                Object.entries(entradasObj).forEach(([key, nota]) => {
+                    if (!nota || typeof nota !== 'object') return;
+                    notasHistoricoMap[key] = nota;
+
+                    let itensNota = [];
+                    if (Array.isArray(nota.itens)) {
+                        itensNota = nota.itens;
+                    } else if (nota.ean && (nota.precoUnit || nota.custo || nota.vlrUnit)) {
+                        itensNota = [nota];
+                    }
+
+                    let dataStr = nota.dataFinalizacao || nota.data || nota.created_at || '';
+                    let timestamp = dataStr ? new Date(dataStr).getTime() : 0;
+                    if (isNaN(timestamp)) timestamp = 0;
+
+                    itensNota.forEach(item => {
+                        let itemEan = String(item.ean || item.codigo || item.eanProduto || '').trim();
+                        if (eansAlvo.has(itemEan)) {
+                            let qtd = Number(item.qtd || item.quantidade || 0);
+                            let custo = Number(item.precoUnit || item.custo || item.vlrUnit || item.precoCusto || 0);
+                            let subtotal = Number(item.subtotal) || (qtd * custo);
+
+                            registrosCompraProduto.push({
+                                notaKey: key,
+                                numeroPedido: nota.numeroPedido || 'S/N',
+                                fornecedor: nota.fornecedor || 'Fornecedor não informado',
+                                lojaCompra: nota.lojaCompra || 'Não informada',
+                                lojaDestino: item.lojaDestino || item.cliente || 'CD',
+                                dataStr: dataStr,
+                                timestamp: timestamp,
+                                ean: itemEan,
+                                descricao: item.descricao || item.produto || '',
+                                qtd: qtd,
+                                custo: custo,
+                                subtotal: subtotal
+                            });
+                        }
+                    });
+                });
+            }
+
+            // Ordena colocando a ÚLTIMA COMPRA no início (decrescente)
+            registrosCompraProduto.sort((a, b) => b.timestamp - a.timestamp);
+
+            if (registrosCompraProduto.length === 0) {
+                listaContainer.innerHTML = `<p class="text-[11px] text-slate-400 dark:text-slate-500 text-center py-3">Nenhuma compra anterior registrada para este produto.</p>`;
+                containerComprasProduto.classList.remove('hidden');
+                return;
+            }
+
+            listaContainer.innerHTML = "";
+            registrosCompraProduto.forEach((reg, idx) => {
+                const dataFormatada = reg.dataStr
+                    ? new Date(reg.dataStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : 'Data N/D';
+                const badgeUltima = idx === 0
+                    ? `<span class="text-[9px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded font-bold uppercase">Última Compra</span>`
+                    : '';
+
+                let card = document.createElement('div');
+                card.className = "bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs space-y-1.5";
+                card.innerHTML = `
+                    <div class="flex justify-between items-center gap-2">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="font-mono font-bold text-amber-600 dark:text-amber-400">#${reg.numeroPedido}</span>
+                            <span class="font-semibold text-slate-900 dark:text-white truncate">${reg.fornecedor}</span>
+                            ${badgeUltima}
+                        </div>
+                        <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                            ${reg.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/un
+                        </span>
+                    </div>
+
+                    <div class="flex flex-wrap justify-between items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+                        <span><i class="fa-regular fa-calendar mr-1"></i>${dataFormatada}</span>
+                        <span class="font-mono">Qtd: <strong class="text-slate-800 dark:text-slate-200">${reg.qtd} un</strong> • Total: <strong class="text-slate-800 dark:text-slate-200">${reg.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></span>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-1 border-t border-slate-200/70 dark:border-slate-800/70 text-[10px]">
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 px-1.5 py-0.5 rounded font-medium">
+                                Compra: <strong>${reg.lojaCompra}</strong>
+                            </span>
+                            <span class="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 px-1.5 py-0.5 rounded font-medium">
+                                Destino: <strong>${reg.lojaDestino}</strong>
+                            </span>
+                        </div>
+                        <button type="button" onclick="abrirModalDetalheCompra('${reg.notaKey}', '${reg.ean}')" class="text-cyan-600 dark:text-cyan-400 hover:underline font-semibold shrink-0">
+                            Ver Nota <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                        </button>
+                    </div>
+                `;
+                listaContainer.appendChild(card);
+            });
+
+            containerComprasProduto.classList.remove('hidden');
+        }
+
         function buscar(termo, exibirAlerta = true) {
             ultimoTermoPesquisado = termo;
+            atualizarVisibilidadeBotaoLimpar();
+
             if (!isDataLoaded) {
                 statusAlert.innerText = "Aguarde, dados ainda sendo carregados...";
                 statusAlert.className = "p-2 rounded-xl text-xs text-center bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800";
@@ -946,6 +1247,14 @@
             }
 
             const lista = Object.values(produtosMap);
+
+            // Exibe a consulta separada de compras do produto (por pedido, última no início)
+            if (termo || selectFiltroProduto.value) {
+                renderizarComprasDoProdutoSelecionado(lista, termo || selectFiltroProduto.value);
+            } else {
+                containerComprasProduto.classList.add('hidden');
+            }
+
             if (lista.length === 0) {
                 statusAlert.classList.add('hidden');
                 resultsContainer.innerHTML = "";
@@ -993,7 +1302,7 @@
                 }
 
                 if (Object.keys(cdMap).length === 0) {
-                    cdMap['CD Filial'] = 0;
+                    cdMap['CD'] = 0;
                 }
 
                 // PROCESSAMENTO DE VENDAS RESTRITO AO PERÍODO
@@ -1235,9 +1544,9 @@
             adicionarNovoProdutoAoPedido(codigo, descricao, categoria, qtd, custo, loja);
         }
 
-        function adicionarNovoProdutoAoPedido(codigo, descricao, categoria, qtd, custo, lojaDestino = 'Geral') {
+        function adicionarNovoProdutoAoPedido(codigo, descricao, categoria, qtd, custo, lojaDestino = 'CD') {
             const subtotal = qtd * custo;
-            const indexExistente = itensPedido.findIndex(i => i.codigo === codigo && (i.lojaDestino || 'Geral') === lojaDestino);
+            const indexExistente = itensPedido.findIndex(i => i.codigo === codigo && (i.lojaDestino || 'CD') === lojaDestino);
 
             if (indexExistente >= 0) {
                 itensPedido[indexExistente].qtd += qtd;
@@ -1286,10 +1595,11 @@
         }
 
         function limparPedido() {
-            if (itensPedido.length === 0 && !document.getElementById('input-fornecedor').value) return;
+            if (itensPedido.length === 0 && !document.getElementById('input-fornecedor').value && !document.getElementById('select-loja-compra').value) return;
             if (confirm("Deseja realmente limpar todos os itens do pedido em edição?")) {
                 itensPedido = [];
                 document.getElementById('input-fornecedor').value = '';
+                document.getElementById('select-loja-compra').value = '';
                 salvarEstadoPedidoAtual();
                 atualizarInterfacePedido();
             }
@@ -1350,14 +1660,14 @@
 
             itensPedido.forEach(item => {
                 totalGeral += item.subtotal;
-                let lojaNome = item.lojaDestino || 'Geral';
+                let lojaNome = item.lojaDestino || 'CD';
                 let div = document.createElement('div');
                 div.className = "flex justify-between items-center bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs transition-colors";
                 div.innerHTML = `
                     <div class="flex-1 pr-2">
                         <div class="font-bold text-slate-900 dark:text-white truncate max-w-[170px]">${item.descricao}</div>
                         <div class="text-[10px] text-slate-500 dark:text-slate-400">
-                            EAN: ${item.codigo} | Loja: <span class="font-semibold text-amber-600 dark:text-amber-400">${lojaNome}</span> | ${item.qtd}x ${item.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            EAN: ${item.codigo} | Destino: <span class="font-semibold text-amber-600 dark:text-amber-400">${lojaNome}</span> | ${item.qtd}x ${item.custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -1424,8 +1734,8 @@
                 const { data: cloudData, error } = await supabaseClient.from('nexxa_store').select('*');
                 if (error) throw error;
 
-                let regEstoque = cloudData.find(d => String(d.id || '').trim().toLowerCase() === 'estoque');
-                let estoqueData = regEstoque ? (regEstoque.data || {}) : {};
+                let regEstoqueLocal = cloudData.find(d => String(d.id || '').trim().toLowerCase() === 'estoque');
+                let estoqueData = regEstoqueLocal ? (regEstoqueLocal.data || {}) : {};
                 
                 let novoKey = "ITEM_" + Date.now();
                 estoqueData[novoKey] = {
@@ -1434,13 +1744,13 @@
                     categoria: categoria,
                     estoque: 0,
                     custo: custo,
-                    cliente: 'Geral'
+                    cliente: 'CD'
                 };
 
                 const { error: saveError } = await supabaseClient
                     .from('nexxa_store')
                     .update({ data: estoqueData })
-                    .eq('id', regEstoque.id);
+                    .eq('id', regEstoqueLocal.id);
 
                 if (saveError) throw saveError;
 
@@ -1450,9 +1760,9 @@
 
                 modalCadastro.classList.add('hidden');
                 
-                adicionarNovoProdutoAoPedido(ean, produto, categoria, qtd, custo, 'Geral');
+                adicionarNovoProdutoAoPedido(ean, produto, categoria, qtd, custo, 'CD');
                 
-                alert("Produto cadastrado e adicionado ao pedido com sucesso!");
+                alert("Produto cadastrado na loja CD e adicionado ao pedido com sucesso!");
                 buscar(ean);
 
             } catch (err) {
@@ -1475,6 +1785,13 @@
             if (!fornecedor) {
                 alert("Por favor, informe o nome do fornecedor.");
                 document.getElementById('input-fornecedor').focus();
+                return;
+            }
+
+            const lojaCompra = document.getElementById('select-loja-compra').value.trim();
+            if (!lojaCompra) {
+                alert("Por favor, selecione a loja onde a compra foi efetuada.");
+                document.getElementById('select-loja-compra').focus();
                 return;
             }
 
@@ -1502,17 +1819,17 @@
 
                 numeroPedidoAtual = numPedidoValidado;
 
-                let regEstoque = cloudData.find(d => String(d.id || '').trim().toLowerCase() === 'estoque');
-                if (!regEstoque) throw new Error("Registro de estoque não encontrado.");
+                let regEstoqueLocal = cloudData.find(d => String(d.id || '').trim().toLowerCase() === 'estoque');
+                if (!regEstoqueLocal) throw new Error("Registro de estoque não encontrado.");
 
-                let estoqueData = regEstoque.data || {};
+                let estoqueData = regEstoqueLocal.data || {};
 
                 itensPedido.forEach(itemPedido => {
                     let encontrado = false;
                     for (let k in estoqueData) {
                         let item = estoqueData[k];
-                        let itemCliente = (item.cliente || 'Geral').trim();
-                        let itemDestino = (itemPedido.lojaDestino || 'Geral').trim();
+                        let itemCliente = (item.cliente || 'CD').trim();
+                        let itemDestino = (itemPedido.lojaDestino || 'CD').trim();
 
                         if (String(item.ean).trim() === itemPedido.codigo && itemCliente === itemDestino) {
                             item.estoque = (Number(item.estoque) || 0) + itemPedido.qtd;
@@ -1532,7 +1849,7 @@
                             estoque: itemPedido.qtd,
                             custo: itemPedido.custo,
                             fornecedor: fornecedor,
-                            cliente: itemPedido.lojaDestino || 'Geral'
+                            cliente: itemPedido.lojaDestino || 'CD'
                         };
                     }
                 });
@@ -1540,15 +1857,20 @@
                 const { error: updateError } = await supabaseClient
                     .from('nexxa_store')
                     .update({ data: estoqueData })
-                    .eq('id', regEstoque.id);
+                    .eq('id', regEstoqueLocal.id);
 
                 if (updateError) throw updateError;
+
+                if (regEstoque) {
+                    regEstoque.data = estoqueData;
+                }
 
                 const notaKey = "NOTA_" + Date.now();
 
                 entradasData[notaKey] = {
                     numeroPedido: numAtualStr,
                     fornecedor: fornecedor,
+                    lojaCompra: lojaCompra,
                     usuarioEmissor: usuarioLogado,
                     dataFinalizacao: new Date().toISOString(),
                     itens: itensPedido,
@@ -1563,7 +1885,7 @@
 
                 regEntradasBase = { id: 'entradas', data: entradasData };
 
-                alert(`Nota de Entrada #${numAtualStr} do fornecedor "${fornecedor}" finalizada por ${usuarioLogado} e salva nas nuvens com sucesso!`);
+                alert(`Nota de Entrada #${numAtualStr} (Loja: ${lojaCompra}) do fornecedor "${fornecedor}" finalizada por ${usuarioLogado} com sucesso!`);
                 
                 delete rascunhos[String(numeroPedidoAtual)];
                 localStorage.setItem('nexxa_rascunhos_pedidos', JSON.stringify(rascunhos));
@@ -1573,15 +1895,262 @@
 
                 itensPedido = [];
                 document.getElementById('input-fornecedor').value = '';
+                document.getElementById('select-loja-compra').value = '';
                 
                 carregarPedidoAtual();
                 atualizarListaPendentes();
-                resultsContainer.innerHTML = "";
+                limparConsultaProduto();
 
             } catch (err) {
                 console.error("Erro detalhado:", err);
                 alert("Erro ao finalizar nota de entrada: " + err.message);
             }
+        }
+
+        // ==========================================
+        // HISTÓRICO DE COMPRAS E DETALHAMENTO POR LOJA
+        // ==========================================
+        function renderizarHistoricoCompras() {
+            const container = document.getElementById('lista-historico-compras');
+            const totalPeriodoEl = document.getElementById('total-historico-periodo');
+            const lojaFiltro = filtroLojaHistorico.value;
+
+            if (!regEntradasBase || !regEntradasBase.data) {
+                container.innerHTML = `<p class="text-[11px] text-slate-400 dark:text-slate-500 text-center py-4">Nenhuma compra registrada no banco.</p>`;
+                totalPeriodoEl.innerText = "R$ 0,00";
+                return;
+            }
+
+            let tInicio = null, tFim = null;
+            if (filtroInicio.value) {
+                let parts = filtroInicio.value.split('-');
+                tInicio = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0).getTime();
+            }
+            if (filtroFim.value) {
+                let parts = filtroFim.value.split('-');
+                tFim = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59).getTime();
+            }
+
+            notasHistoricoMap = {};
+            let entradasObj = Array.isArray(regEntradasBase.data) 
+                ? regEntradasBase.data.reduce((acc, item, idx) => ({ ...acc, [`IDX_${idx}`]: item }), {})
+                : regEntradasBase.data;
+
+            let listaNotasFiltradas = [];
+
+            Object.entries(entradasObj).forEach(([key, nota]) => {
+                if (!nota || typeof nota !== 'object') return;
+                notasHistoricoMap[key] = nota;
+
+                let dataStr = nota.dataFinalizacao || nota.data || nota.created_at || '';
+                let dentroPeriodo = true;
+
+                if (tInicio !== null || tFim !== null) {
+                    if (!dataStr) {
+                        dentroPeriodo = false;
+                    } else {
+                        let dataPura = String(dataStr).split('T')[0].split(' ')[0];
+                        let partsN = dataPura.split('-');
+                        if (partsN.length === 3) {
+                            let tNota = new Date(partsN[0], partsN[1] - 1, partsN[2], 12, 0, 0).getTime();
+                            if (tInicio !== null && tNota < tInicio) dentroPeriodo = false;
+                            if (tFim !== null && tNota > tFim) dentroPeriodo = false;
+                        } else {
+                            let tNotaFallback = new Date(dataStr).getTime();
+                            if (isNaN(tNotaFallback)) {
+                                dentroPeriodo = false;
+                            } else {
+                                if (tInicio !== null && tNotaFallback < tInicio) dentroPeriodo = false;
+                                if (tFim !== null && tNotaFallback > tFim) dentroPeriodo = false;
+                            }
+                        }
+                    }
+                }
+
+                if (!dentroPeriodo) return;
+
+                const lojaCompraNota = (nota.lojaCompra || '').trim();
+                const itensNota = Array.isArray(nota.itens) ? nota.itens : [];
+                const lojasDestinoNota = new Set(itensNota.map(i => (i.lojaDestino || 'Geral').trim()));
+
+                if (lojaFiltro) {
+                    const bateLojaCompra = lojaCompraNota.toLowerCase() === lojaFiltro.toLowerCase();
+                    const bateLojaDestino = Array.from(lojasDestinoNota).some(l => l.toLowerCase() === lojaFiltro.toLowerCase());
+                    if (!bateLojaCompra && !bateLojaDestino) return;
+                }
+
+                listaNotasFiltradas.push({ key, nota, dataTimestamp: dataStr ? new Date(dataStr).getTime() : 0 });
+            });
+
+            listaNotasFiltradas.sort((a, b) => b.dataTimestamp - a.dataTimestamp);
+
+            if (listaNotasFiltradas.length === 0) {
+                container.innerHTML = `<p class="text-[11px] text-slate-400 dark:text-slate-500 text-center py-4">Nenhuma compra encontrada para o período/filtro selecionado.</p>`;
+                totalPeriodoEl.innerText = "R$ 0,00";
+                return;
+            }
+
+            let somaPeriodo = 0;
+            container.innerHTML = "";
+
+            listaNotasFiltradas.forEach(({ key, nota }) => {
+                const totalNota = Number(nota.totalGeral) || (Array.isArray(nota.itens) ? nota.itens.reduce((acc, i) => acc + (Number(i.subtotal) || 0), 0) : 0);
+                somaPeriodo += totalNota;
+
+                const numPed = nota.numeroPedido || 'S/N';
+                const fornecedor = nota.fornecedor || 'Fornecedor não informado';
+                const lojaCompra = nota.lojaCompra || 'Não informada';
+                const dataFormatada = nota.dataFinalizacao 
+                    ? new Date(nota.dataFinalizacao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : 'Data N/D';
+                const qtdItensTotal = Array.isArray(nota.itens) ? nota.itens.reduce((acc, i) => acc + (Number(i.qtd) || 0), 0) : 0;
+
+                let cardNota = document.createElement('div');
+                cardNota.className = "bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2 text-xs transition-colors";
+                cardNota.innerHTML = `
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-mono font-bold text-amber-600 dark:text-amber-400">#${numPed}</span>
+                                <span class="font-bold text-slate-900 dark:text-white truncate">${fornecedor}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                <i class="fa-regular fa-calendar mr-1"></i>${dataFormatada} • ${qtdItensTotal} un
+                            </div>
+                        </div>
+                        <span class="font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                            ${totalNota.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                    </div>
+
+                    <div class="flex justify-between items-center pt-1.5 border-t border-slate-200 dark:border-slate-800/80">
+                        <span class="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50 px-2 py-0.5 rounded font-semibold">
+                            <i class="fa-solid fa-store mr-1"></i>Comprada em: ${lojaCompra}
+                        </span>
+                        <button onclick="abrirModalDetalheCompra('${key}')" class="text-[11px] bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-2.5 py-1 rounded-lg transition flex items-center gap-1">
+                            <i class="fa-solid fa-list-ul"></i> Itens por Loja
+                        </button>
+                    </div>
+                `;
+                container.appendChild(cardNota);
+            });
+
+            totalPeriodoEl.innerText = somaPeriodo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function abrirModalDetalheCompra(notaKey, eanFiltro = null) {
+            const nota = notasHistoricoMap[notaKey];
+            if (!nota) return;
+
+            eanFiltroDetalheModal = eanFiltro ? String(eanFiltro).trim() : null;
+
+            const modal = document.getElementById('modal-detalhe-compra');
+            const titulo = document.getElementById('detalhe-nota-titulo');
+            const subtitulo = document.getElementById('detalhe-nota-subtitulo');
+            const cabecalho = document.getElementById('detalhe-nota-cabecalho');
+            const conteudoLojas = document.getElementById('detalhe-nota-conteudo-lojas');
+            const totalEl = document.getElementById('detalhe-nota-total');
+
+            const numPed = nota.numeroPedido || 'S/N';
+            const fornecedor = nota.fornecedor || 'Não informado';
+            const lojaCompra = nota.lojaCompra || 'Não informada';
+            const emissor = nota.usuarioEmissor || 'Não informado';
+            const dataFormatada = nota.dataFinalizacao 
+                ? new Date(nota.dataFinalizacao).toLocaleString('pt-BR')
+                : 'Data não registrada';
+
+            titulo.innerHTML = `<i class="fa-solid fa-file-invoice"></i> Compra #${numPed}${eanFiltroDetalheModal ? ' (Produto Ean: ' + eanFiltroDetalheModal + ')' : ''}`;
+            subtitulo.innerText = `${fornecedor} • ${dataFormatada}`;
+
+            cabecalho.innerHTML = `
+                <div class="flex justify-between">
+                    <span class="text-slate-500 dark:text-slate-400">Loja onde foi comprada:</span>
+                    <strong class="text-blue-600 dark:text-blue-400">${lojaCompra}</strong>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-500 dark:text-slate-400">Lançado por:</span>
+                    <strong class="text-slate-800 dark:text-slate-200">${emissor}</strong>
+                </div>
+            `;
+
+            let itens = Array.isArray(nota.itens) ? nota.itens : [];
+            
+            // Se foi aberto a partir de um produto específico, filtra somente ele
+            if (eanFiltroDetalheModal) {
+                itens = itens.filter(it => String(it.ean || it.codigo || it.eanProduto || '').trim() === eanFiltroDetalheModal);
+            }
+
+            const gruposPorLoja = {};
+            let totalGeralNota = 0;
+
+            itens.forEach(item => {
+                const lojaDestino = (item.lojaDestino || 'Geral').trim();
+                if (!gruposPorLoja[lojaDestino]) {
+                    gruposPorLoja[lojaDestino] = {
+                        itens: [],
+                        subtotalLoja: 0,
+                        qtdLoja: 0
+                    };
+                }
+                const sub = Number(item.subtotal) || (Number(item.qtd || 0) * Number(item.custo || 0));
+                gruposPorLoja[lojaDestino].itens.push(item);
+                gruposPorLoja[lojaDestino].subtotalLoja += sub;
+                gruposPorLoja[lojaDestino].qtdLoja += Number(item.qtd || 0);
+                totalGeralNota += sub;
+            });
+
+            conteudoLojas.innerHTML = "";
+
+            const lojasOrdenadas = Object.keys(gruposPorLoja).sort();
+            if (lojasOrdenadas.length === 0) {
+                conteudoLojas.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">Nenhum item correspondente encontrado nesta nota.</p>`;
+            } else {
+                lojasOrdenadas.forEach(loja => {
+                    const grupo = gruposPorLoja[loja];
+                    let blocoLoja = document.createElement('div');
+                    blocoLoja.className = "border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-950";
+
+                    let linhasItens = grupo.itens.map(it => {
+                        const qtd = Number(it.qtd || 0);
+                        const custo = Number(it.custo || 0);
+                        const sub = Number(it.subtotal) || (qtd * custo);
+                        return `
+                            <div class="flex justify-between items-center p-2 border-b border-slate-200/70 dark:border-slate-800/70 last:border-b-0 text-[11px]">
+                                <div class="pr-2 min-w-0">
+                                    <div class="font-semibold text-slate-800 dark:text-slate-200 truncate">${it.descricao || 'Produto'}</div>
+                                    <div class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                        EAN: ${it.codigo || '-'} • ${qtd}x ${custo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </div>
+                                </div>
+                                <span class="font-mono font-bold text-slate-900 dark:text-white shrink-0">
+                                    ${sub.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </span>
+                            </div>
+                        `;
+                    }).join('');
+
+                    blocoLoja.innerHTML = `
+                        <div class="bg-slate-100 dark:bg-slate-900 px-3 py-2 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+                            <span class="font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                                <i class="fa-solid fa-store"></i> Destino: ${loja}
+                            </span>
+                            <span class="font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                ${grupo.qtdLoja} un • ${grupo.subtotalLoja.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </span>
+                        </div>
+                        <div>${linhasItens}</div>
+                    `;
+                    conteudoLojas.appendChild(blocoLoja);
+                });
+            }
+
+            totalEl.innerText = totalGeralNota.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            modal.classList.remove('hidden');
+        }
+
+        function fecharModalDetalheCompra() {
+            eanFiltroDetalheModal = null;
+            document.getElementById('modal-detalhe-compra').classList.add('hidden');
         }
     </script>
 </body>
