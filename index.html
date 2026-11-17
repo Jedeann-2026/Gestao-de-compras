@@ -266,6 +266,19 @@
                 </select>
             </div>
 
+            <!-- FILTRO INDEPENDENTE DE FORNECEDOR COM BOTÃO DE PESQUISA -->
+            <div class="flex gap-1.5 pt-1">
+                <div class="relative flex-1">
+                    <input type="text" id="input-filtro-fornecedor" placeholder="Filtrar por nome do fornecedor..." class="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl pl-3 pr-7 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-400">
+                    <button type="button" id="btn-limpar-fornecedor" onclick="limparFiltroFornecedor()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 p-1" title="Limpar fornecedor">
+                        <i class="fa-solid fa-circle-xmark text-xs"></i>
+                    </button>
+                </div>
+                <button type="button" onclick="pesquisarPorFornecedor()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-2 rounded-xl text-xs transition shrink-0 font-bold" title="Pesquisar Fornecedor">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+            </div>
+
             <div id="resumo-historico-periodo" class="bg-slate-50 dark:bg-slate-950 rounded-xl p-2.5 border border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
                 <span class="text-slate-500 dark:text-slate-400">Total Comprado no Período:</span>
                 <span id="total-historico-periodo" class="font-bold text-amber-600 dark:text-amber-400 font-mono">R$ 0,00</span>
@@ -386,6 +399,8 @@
         const formManual = document.getElementById('form-manual');
         const inputSearch = document.getElementById('input-search');
         const btnLimparConsulta = document.getElementById('btn-limpar-consulta');
+        const inputFiltroFornecedor = document.getElementById('input-filtro-fornecedor');
+        const btnLimparFornecedor = document.getElementById('btn-limpar-fornecedor');
         const filtroInicio = document.getElementById('filtro-inicio');
         const filtroFim = document.getElementById('filtro-fim');
         const resultsContainer = document.getElementById('results-container');
@@ -649,8 +664,23 @@
             containerComprasProduto.classList.add('hidden');
             statusAlert.classList.add('hidden');
             btnLimparConsulta.classList.add('hidden');
-            renderizarHistoricoCompras();
             if (focarInput) inputSearch.focus();
+        }
+
+        function pesquisarPorFornecedor() {
+            const textoFornecedor = inputFiltroFornecedor.value.trim();
+            if (textoFornecedor !== '') {
+                btnLimparFornecedor.classList.remove('hidden');
+            } else {
+                btnLimparFornecedor.classList.add('hidden');
+            }
+            renderizarHistoricoCompras();
+        }
+
+        function limparFiltroFornecedor() {
+            inputFiltroFornecedor.value = '';
+            btnLimparFornecedor.classList.add('hidden');
+            renderizarHistoricoCompras();
         }
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -1930,6 +1960,7 @@
                 carregarPedidoAtual();
                 atualizarListaPendentes();
                 limparConsultaProduto();
+                renderizarHistoricoCompras();
 
             } catch (err) {
                 console.error("Erro detalhado:", err);
@@ -1944,6 +1975,7 @@
             const container = document.getElementById('lista-historico-compras');
             const totalPeriodoEl = document.getElementById('total-historico-periodo');
             const lojaFiltro = filtroLojaHistorico.value;
+            const fornecedorFiltro = inputFiltroFornecedor.value.trim().toUpperCase();
 
             if (!regEntradasBase || !regEntradasBase.data) {
                 container.innerHTML = `<p class="text-[11px] text-slate-400 dark:text-slate-500 text-center py-4">Nenhuma compra registrada no banco.</p>`;
@@ -1998,6 +2030,11 @@
                 }
 
                 if (!dentroPeriodo) return;
+
+                if (fornecedorFiltro) {
+                    const fornecedorNota = String(nota.fornecedor || '').trim().toUpperCase();
+                    if (!fornecedorNota.includes(fornecedorFiltro)) return;
+                }
 
                 const lojaCompraNota = (nota.lojaCompra || '').trim();
                 const itensNota = Array.isArray(nota.itens) ? nota.itens : [];
