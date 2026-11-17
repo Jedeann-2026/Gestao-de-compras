@@ -735,7 +735,7 @@
                 console.error(err);
                 statusAlert.innerText = "Erro ao abrir câmera. Verifique permissões no Safari/iOS.";
                 statusAlert.className = "p-2 rounded-xl text-xs text-center bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800";
-                statusAlert.classList.remove('hidden');
+                statusAlert.classList.add('hidden');
                 pararCameraZXing();
             }
         }
@@ -923,6 +923,27 @@
             });
 
             return ultimoPreco;
+        }
+
+        function obterPrecoOficialEstoquePorLoja(eanAlvo, nomeLoja) {
+            if (!regEstoque || !regEstoque.data) return 0;
+            
+            let dadosEstoque = Array.isArray(regEstoque.data) ? regEstoque.data : Object.values(regEstoque.data);
+            let precoEncontrado = 0;
+
+            dadosEstoque.forEach(item => {
+                let ean = String(item.ean || '').trim();
+                let cliente = String(item.cliente || '').trim();
+                
+                if (ean === String(eanAlvo).trim() && cliente.toLowerCase() === String(nomeLoja).toLowerCase()) {
+                    let p = parseFloat(item.preco || item.preco_venda || item.pvenda || item.valor || 0);
+                    if (p > 0) {
+                        precoEncontrado = p;
+                    }
+                }
+            });
+
+            return precoEncontrado;
         }
 
         function calcularPrecoSugerido(codigoEan) {
@@ -1288,6 +1309,7 @@
                         if (itemEan === info.codigo) {
                             let cliente = (item.cliente || 'Geral').trim();
                             let qtd = Number(item.estoque) || 0;
+                            let precoEstoqueOficial = parseFloat(item.preco || item.preco_venda || item.pvenda || item.valor || 0);
 
                             if (cliente.toUpperCase().startsWith('CD')) {
                                 cdTotal += qtd;
@@ -1295,6 +1317,9 @@
                             } else {
                                 if (!clientMap[cliente]) clientMap[cliente] = { estoque: 0, preco: 0 };
                                 clientMap[cliente].estoque += qtd;
+                                if (precoEstoqueOficial > 0) {
+                                    clientMap[cliente].preco = precoEstoqueOficial;
+                                }
                                 lojaTotalSum += qtd;
                             }
                         }
@@ -1320,7 +1345,8 @@
                                 if (!clientMap[cliente]) {
                                     clientMap[cliente] = { estoque: 0, preco: 0 };
                                 }
-                                if (preco > 0) {
+                                // Só atribui o preço da venda se a loja não tiver preço oficial de estoque cadastrado
+                                if (preco > 0 && !clientMap[cliente].preco) {
                                     clientMap[cliente].preco = preco;
                                 }
                             }
@@ -1413,7 +1439,11 @@
                 Array.from(todasLojasSet).sort().forEach(loja => {
                     let dadosLoja = clientMap[loja] || { estoque: 0, preco: 0 };
                     let estLoja = dadosLoja.estoque || 0;
-                    let prcLoja = dadosLoja.preco > 0 ? dadosLoja.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem registro';
+                    
+                    // Garante prioridade ao preço oficial da loja
+                    let precoOficialLoja = dadosLoja.preco > 0 ? dadosLoja.preco : obterPrecoOficialEstoquePorLoja(info.codigo, loja);
+                    let prcLoja = precoOficialLoja > 0 ? precoOficialLoja.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem registro';
+                    
                     let vendaLoja = vendasPorLojaMap[loja] ? vendasPorLojaMap[loja].qtdVenda : 0;
                     
                     let sugLoja = Math.max(0, vendaLoja - estLoja);
